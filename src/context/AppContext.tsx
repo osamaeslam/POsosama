@@ -52,6 +52,9 @@ interface AppContextType {
 
   // Categories & Products
   categories: Category[];
+  addCategory: (category: Omit<Category, 'id'>) => Category;
+  updateCategory: (id: string, updates: Partial<Category>) => void;
+  deleteCategory: (id: string) => void;
   products: Product[];
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
   updateProduct: (id: string, updates: Partial<Product>) => void;
@@ -231,6 +234,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return initialCategories;
   });
+
+  const saveCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+    appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(newCategories));
+  };
+
+  const addCategory = (category: Omit<Category, 'id'>): Category => {
+    const newCategory: Category = { ...category, id: `category-${Date.now()}` };
+    saveCategories([...categories, newCategory]);
+    return newCategory;
+  };
+
+  const updateCategory = (id: string, updates: Partial<Category>) => {
+    saveCategories(categories.map((category) => category.id === id ? { ...category, ...updates } : category));
+  };
+
+  const deleteCategory = (id: string) => {
+    if (products.some((product) => product.categoryId === id)) {
+      throw new Error('لا يمكن حذف فئة مرتبطة بمنتجات. انقل المنتجات أولاً.');
+    }
+    saveCategories(categories.filter((category) => category.id !== id));
+  };
 
   // 6. Products
   const [products, setProducts] = useState<Product[]>(() => {
@@ -984,6 +1009,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         updateSettings,
         categories,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         products,
         addProduct,
         updateProduct,
