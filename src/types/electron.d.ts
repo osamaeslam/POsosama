@@ -14,6 +14,7 @@ export type BayaaDesktop = {
     getPaths: () => Promise<{ database: string; backups: string }>
     openBackups: () => Promise<void>
     exportBackup: () => Promise<string | null>
+    restoreBackup: () => Promise<boolean | null>
   }
 }
 
