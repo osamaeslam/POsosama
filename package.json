@@ -2,8 +2,8 @@
   "name": "bayaa-pos",
   "private": true,
   "version": "1.0.0",
-  "description": "Bayaa POS offline desktop point-of-sale application",
-  "author": "Bayaa POS",
+  "description": "Osama Pos offline desktop point-of-sale application",
+  "author": "Osama Pos",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.bayaa.pos",
-    "productName": "Bayaa POS",
+    "productName": "Osama Pos",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*", "package.json"],
     "asar": true,

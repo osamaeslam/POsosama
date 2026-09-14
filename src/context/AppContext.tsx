@@ -897,7 +897,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 12. Backup, Restore & Reset
   const exportDataJson = () => {
     const payload = {
-      appName: 'Bayaa POS',
+      appName: 'Osama Pos',
       version: '2.1.0',
       exportDate: new Date().toISOString(),
       settings,
@@ -914,7 +914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bayaa-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `osama-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -925,8 +925,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const data = JSON.parse(jsonString);
       const collections = ['users', 'categories', 'products', 'customers', 'debtPayments', 'sales', 'shifts', 'expenses'];
-      if (!data || data.appName !== 'Bayaa POS' || collections.some((key) => !Array.isArray(data[key]))) {
-        throw new Error('Invalid or incomplete Bayaa POS backup');
+      if (!data || !['Osama Pos', 'Bayaa POS'].includes(data.appName) || collections.some((key) => !Array.isArray(data[key]))) {
+        throw new Error('Invalid or incomplete Osama Pos backup');
       }
       if (!data.settings || typeof data.settings !== 'object') {
         throw new Error('Backup settings are missing');
