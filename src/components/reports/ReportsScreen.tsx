@@ -47,6 +47,7 @@ export const ReportsScreen: React.FC = () => {
   const grossSalesRevenue = salesList.reduce((sum, s) => sum + s.total, 0);
   const totalRefundsAmount = refundsList.reduce((sum, s) => sum + s.total, 0);
   const netRevenue = Math.max(0, grossSalesRevenue - totalRefundsAmount);
+  const totalRevenue = netRevenue;
 
   const totalCost = salesList.reduce((sum, s) => {
     const saleCost = s.items.reduce((c, it) => c + (it.cost || 0) * (it.quantity - (it.refundedQuantity || 0)), 0);
@@ -62,6 +63,10 @@ export const ReportsScreen: React.FC = () => {
 
   const creditSalesTotal = salesList
     .filter((s) => s.paymentMethod === 'credit')
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const cardSalesTotal = salesList
+    .filter((s) => s.paymentMethod === 'card')
     .reduce((sum, s) => sum + s.total, 0);
 
   const walletSalesTotal = salesList
