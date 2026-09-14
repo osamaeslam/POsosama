@@ -384,7 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalExpenses: 0,
       isOpen: true,
     };
-    const updated = [newShift, ...shifts.map((s) => (s.isOpen ? { ...s, isOpen: false } : s))];
+    const updated = [newShift, ...shifts];
     saveShifts(updated);
     return newShift;
   };
@@ -399,14 +399,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentShift.totalDebtCollectionsCash -
       currentShift.totalRefunds -
       currentShift.totalExpenses;
-    const diff = Number(closingCash) - expected;
+    const countedCash = Number(closingCash);
+    if (!Number.isFinite(countedCash) || countedCash < 0) {
+      throw new Error('أدخل مبلغ النقدية الفعلي بشكل صحيح');
+    }
+    const diff = countedCash - expected;
 
     const closed: Shift = {
       ...currentShift,
       isOpen: false,
       closeTime: getSafeTimestamp(),
       closedBy: currentUser.displayName,
-      closingCash: Number(closingCash),
+      closingCash: Number.isFinite(Number(closingCash)) ? Number(closingCash) : 0,
       expectedCash: expected,
       cashDifference: diff,
     };
