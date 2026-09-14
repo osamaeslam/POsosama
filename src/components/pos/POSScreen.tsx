@@ -149,6 +149,11 @@ export const POSScreen: React.FC = () => {
     if (item) updateItemPrice(productId, Number(item.product.wholesalePrice) || 0);
   };
 
+  const setRetailPrice = (productId: string) => {
+    const item = cart.find((cartItem) => cartItem.product.id === productId);
+    if (item) updateItemPrice(productId, Number(item.product.price) || 0);
+  };
+
   // Update item quantity
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) =>
@@ -246,21 +251,27 @@ export const POSScreen: React.FC = () => {
       return;
     }
 
-    const sale = checkoutCart(
-      cart,
-      paymentMethod,
-      discountAmount,
-      paymentMethod === 'cash' ? parsedCashReceived : undefined,
-      notes,
-      {
-        customerId: targetCustomerId,
-        customerName: targetCustomerName,
-        customerPhone: targetCustomerPhone,
-        creditPaidAmount: advancePaid,
-        walletProvider: paymentMethod === 'wallet' ? walletProvider : undefined,
-        walletRefNumber: paymentMethod === 'wallet' ? walletRefNumber.trim() : undefined,
-      }
-    );
+    let sale: Sale;
+    try {
+      sale = checkoutCart(
+        cart,
+        paymentMethod,
+        discountAmount,
+        paymentMethod === 'cash' ? parsedCashReceived : undefined,
+        notes,
+        {
+          customerId: targetCustomerId,
+          customerName: targetCustomerName,
+          customerPhone: targetCustomerPhone,
+          creditPaidAmount: advancePaid,
+          walletProvider: paymentMethod === 'wallet' ? walletProvider : undefined,
+          walletRefNumber: paymentMethod === 'wallet' ? walletRefNumber.trim() : undefined,
+        }
+      );
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'تعذر تسجيل البيع، حاول مرة أخرى');
+      return;
+    }
 
     if (shouldPrint) {
       setCompletedSale(sale);
@@ -493,6 +504,13 @@ export const POSScreen: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setRetailPrice(item.product.id)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${item.price === item.product.price ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'}`}
+                    >
+                      عادي: {item.product.price.toLocaleString()}
+                    </button>
                     <button
                       type="button"
                       onClick={() => setWholesalePrice(item.product.id)}
