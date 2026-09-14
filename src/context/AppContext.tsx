@@ -242,7 +242,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialProducts;
+    return [];
   });
 
   const saveProducts = (newProducts: Product[]) => {
@@ -293,7 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialCustomers;
+    return [];
   });
 
   const saveCustomers = (newCustomers: Customer[]) => {
@@ -354,7 +354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialShifts;
+    return [];
   });
 
   const saveShifts = (newShifts: Shift[]) => {
@@ -489,7 +489,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSales;
+    return [];
   });
 
   const saveSales = (newSales: Sale[]) => {
@@ -784,7 +784,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialExpenses;
+    return [];
   });
 
   const saveExpenses = (newExpenses: Expense[]) => {
@@ -908,18 +908,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllData = () => {
-    saveProducts(initialProducts);
-    setCategories(initialCategories);
-    appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
-    saveCustomers(initialCustomers);
-    saveDebtPayments(initialDebtPayments);
-    saveSales(initialSales);
-    saveShifts(initialShifts);
-    saveExpenses(initialExpenses);
-    setSettings(initialStoreSettings);
-    appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialStoreSettings));
-    setUsers(initialUsers);
-    appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+    saveProducts([]);
+    setCategories([]);
+    appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+    saveCustomers([]);
+    saveDebtPayments([]);
+    saveSales([]);
+    saveShifts([]);
+    saveExpenses([]);
   };
 
   return (

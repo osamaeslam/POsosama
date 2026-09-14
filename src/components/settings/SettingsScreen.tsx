@@ -8,7 +8,6 @@ import {
   Users,
   Download,
   Upload,
-  RefreshCw,
   Save,
   CheckCircle2,
   AlertTriangle,
@@ -27,7 +26,6 @@ export const SettingsScreen: React.FC = () => {
     currentUser,
     exportDataJson,
     importDataJson,
-    resetAllData,
     clearToEmptyStore,
   } = useApp();
 
@@ -354,22 +352,6 @@ export const SettingsScreen: React.FC = () => {
                 <span>تصفير النظام والبدء بمتجر فارغ حقيقي (بدون أي بيانات وهمية)</span>
               </button>
 
-              <button
-                onClick={() => {
-                  if (
-                    confirm(
-                      'تحذير: هل أنت متأكد من إعادة تعيين البيانات لبيانات العرض التوضيحية الافتراضية؟ سيتم استبدال البيانات الحالية.'
-                    )
-                  ) {
-                    resetAllData();
-                    alert('تمت استعادة البيانات التوضيحية بنجاح.');
-                  }
-                }}
-                className="w-full py-2 px-3 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>إعادة تعيين البيانات الافتراضية للتجربة (Reset Demo)</span>
-              </button>
             </div>
           </div>
 

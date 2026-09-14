@@ -42,7 +42,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
   const badge = getPaymentBadge();
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 md:p-4 overflow-y-auto">
+    <div className={`fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 md:p-4 overflow-y-auto ${printFormat === 'thermal' ? 'print-thermal' : 'print-a4'}`}>
       {/* On-screen modal card (hidden during print) */}
       <div className="no-print bg-white rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 my-4 max-h-[95vh] flex flex-col">
         {/* Header */}
