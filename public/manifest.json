@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "Bayaa POS - بياع لإدارة نقاط البيع",
+  "short_name": "بياع POS",
+  "description": "نظام نقاط البيع وإدارة التجزئة والمخزون والمبيعات محلياً بدون إنترنت",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/assets/iconr.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/Icon_app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
