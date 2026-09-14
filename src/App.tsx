@@ -45,7 +45,7 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans text-slate-800 antialiased select-none">
+    <div className="app-shell flex h-screen w-screen min-w-0 overflow-hidden bg-slate-100 font-sans text-slate-800 antialiased select-none">
       {/* Sidebar navigation */}
       <Sidebar />
 
