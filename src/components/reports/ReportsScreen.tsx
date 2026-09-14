@@ -69,7 +69,6 @@ export const ReportsScreen: React.FC = () => {
     .reduce((sum, s) => sum + s.total, 0);
 
   const cardSalesTotal = creditSalesTotal + walletSalesTotal;
-  const totalRevenue = grossSalesRevenue;
 
   // Top selling products
   const productSalesMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
@@ -162,7 +161,7 @@ export const ReportsScreen: React.FC = () => {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-semibold text-slate-500">إجمالي الإيرادات (المبيعات)</span>
           <div className="text-2xl font-black text-slate-900 mt-2 font-mono">
-            {totalRevenue.toLocaleString()} <span className="text-xs text-slate-400 font-bold">{settings.currency}</span>
+            {netRevenue.toLocaleString()} <span className="text-xs text-slate-400 font-bold">{settings.currency}</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-1">{filteredSales.length} فاتورة مسجلة</div>
         </div>
@@ -259,13 +258,13 @@ export const ReportsScreen: React.FC = () => {
                     <span>النقد (كاش)</span>
                   </span>
                   <span className="font-mono">
-                    {totalRevenue > 0 ? Math.round((cashSalesTotal / totalRevenue) * 100) : 0}%
+                    {netRevenue > 0 ? Math.round((cashSalesTotal / netRevenue) * 100) : 0}%
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
                     style={{
-                      width: `${totalRevenue > 0 ? (cashSalesTotal / totalRevenue) * 100 : 0}%`,
+                      width: `${netRevenue > 0 ? (cashSalesTotal / netRevenue) * 100 : 0}%`,
                     }}
                     className="h-full bg-emerald-500 rounded-full"
                   />
@@ -279,13 +278,13 @@ export const ReportsScreen: React.FC = () => {
                     <span>البطاقات والشبكة</span>
                   </span>
                   <span className="font-mono">
-                    {totalRevenue > 0 ? Math.round((cardSalesTotal / totalRevenue) * 100) : 0}%
+                    {netRevenue > 0 ? Math.round((cardSalesTotal / netRevenue) * 100) : 0}%
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
                     style={{
-                      width: `${totalRevenue > 0 ? (cardSalesTotal / totalRevenue) * 100 : 0}%`,
+                      width: `${netRevenue > 0 ? (cardSalesTotal / netRevenue) * 100 : 0}%`,
                     }}
                     className="h-full bg-blue-500 rounded-full"
                   />
