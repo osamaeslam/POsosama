@@ -12,6 +12,7 @@ import { DebtsScreen } from './components/customers/DebtsScreen';
 import { SessionsScreen } from './components/shifts/SessionsScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MainAppContent: React.FC = () => {
   const { activeTab } = useApp();
@@ -61,8 +62,10 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainAppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainAppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

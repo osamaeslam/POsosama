@@ -13,7 +13,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
   const { settings, t } = useApp();
   const [printFormat, setPrintFormat] = useState<'thermal' | 'a4'>('thermal');
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (printFormat === 'thermal' && window.bayaaDesktop?.isDesktop) {
+      const printed = await window.bayaaDesktop.app.print();
+      if (printed) return;
+    }
     window.print();
   };
 

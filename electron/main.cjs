@@ -5,6 +5,17 @@ const Database = require('better-sqlite3')
 
 let mainWindow
 let database
+let backupTimer
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
+}
 
 function getDatabasePath() {
   return path.join(app.getPath('userData'), 'bayaa-pos.sqlite')
@@ -34,7 +45,7 @@ function openDatabase() {
 }
 
 function createBackup() {
-  if (!database) return null
+  if (!database || database.open === false) return null
   const backupDirectory = getBackupDirectory()
   fs.mkdirSync(backupDirectory, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -84,6 +95,12 @@ function registerDatabaseHandlers() {
   })
 
   ipcMain.handle('db:backup', () => createBackup())
+  ipcMain.handle('app:print', async () => {
+    if (!mainWindow) return false
+    return new Promise((resolve) => {
+      mainWindow.webContents.print({ silent: false, printBackground: true, margins: { marginType: 'none' } }, (success) => resolve(success))
+    })
+  })
   ipcMain.handle('app:get-paths', () => ({ database: getDatabasePath(), backups: getBackupDirectory() }))
   ipcMain.handle('app:open-backups', () => shell.openPath(getBackupDirectory()))
   ipcMain.handle('app:export-backup', async () => {
@@ -122,15 +139,22 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  fs.mkdirSync(getBackupDirectory(), { recursive: true })
   openDatabase()
   registerDatabaseHandlers()
   createWindow()
+  try { createBackup() } catch (error) { console.error('Startup backup failed:', error) }
+  backupTimer = setInterval(() => {
+    try { createBackup() } catch (error) { console.error('Automatic backup failed:', error) }
+  }, 24 * 60 * 60 * 1000)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('before-quit', () => {
+  if (backupTimer) clearInterval(backupTimer)
+  try { createBackup() } catch (error) { console.error('Shutdown backup failed:', error) }
   if (database) database.close()
 })
 
@@ -138,6 +162,3 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-setInterval(() => {
-  try { createBackup() } catch (error) { console.error('Automatic backup failed:', error) }
-}, 24 * 60 * 60 * 1000)
