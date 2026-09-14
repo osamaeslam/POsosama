@@ -154,8 +154,9 @@ function validateSqliteFile(filePath) {
   try {
     const candidate = new Database(filePath, { readonly: true, fileMustExist: true })
     const row = candidate.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_data'").get()
+    const integrity = candidate.pragma('integrity_check', { simple: true })
     candidate.close()
-    return Boolean(row)
+    return Boolean(row) && integrity === 'ok'
   } catch (error) {
     console.error('SQLite validation failed:', error)
     return false
@@ -172,6 +173,7 @@ async function restoreDatabase() {
   const source = result.filePaths[0]
   if (!validateSqliteFile(source)) throw new Error('ملف قاعدة البيانات غير صالح')
   const databasePath = getDatabasePath()
+  createBackup()
   const restorePath = `${databasePath}.restore-${Date.now()}`
   fs.copyFileSync(source, restorePath)
   if (database) database.close()
@@ -200,6 +202,7 @@ function registerDatabaseHandlers() {
 
   ipcMain.on('db:delete-sync', (event, key) => {
     database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
+    syncNormalizedData(key, [])
     event.returnValue = true
   })
 
@@ -221,6 +224,7 @@ function registerDatabaseHandlers() {
 
   ipcMain.handle('db:delete', (_event, key) => {
     database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
+    syncNormalizedData(key, [])
     return true
   })
 
