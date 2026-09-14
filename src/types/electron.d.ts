@@ -10,6 +10,7 @@ export type BayaaDesktop = {
     backup: () => Promise<string | null>
   }
   app: {
+    print: () => Promise<boolean>
     getPaths: () => Promise<{ database: string; backups: string }>
     openBackups: () => Promise<void>
     exportBackup: () => Promise<string | null>

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('bayaaDesktop', {
     backup: () => ipcRenderer.invoke('db:backup'),
   },
   app: {
+    print: () => ipcRenderer.invoke('app:print'),
     getPaths: () => ipcRenderer.invoke('app:get-paths'),
     openBackups: () => ipcRenderer.invoke('app:open-backups'),
     exportBackup: () => ipcRenderer.invoke('app:export-backup'),
