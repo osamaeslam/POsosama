@@ -117,6 +117,16 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'bayaa_pos_customers',
   DEBT_PAYMENTS: 'bayaa_pos_debt_payments',
   INITIALIZED: 'bayaa_pos_initialized_v2',
+  LAST_EVENT_TIME: 'bayaa_pos_last_event_time',
+};
+
+// Keeps local timestamps monotonic when an offline device clock is stale or moved backwards.
+const getSafeTimestamp = (): string => {
+  const now = Date.now();
+  const last = Number(localStorage.getItem(STORAGE_KEYS.LAST_EVENT_TIME) || 0);
+  const safeTime = Math.max(now, last + 1);
+  localStorage.setItem(STORAGE_KEYS.LAST_EVENT_TIME, String(safeTime));
+  return new Date(safeTime).toISOString();
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -226,7 +236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newProduct: Product = {
       ...item,
       id: String(Date.now()),
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       updatedAt: new Date().toISOString(),
     };
     const updated = [newProduct, ...products];
@@ -278,7 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...item,
       id: `cust_${Date.now()}`,
       totalDebt: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       updatedAt: new Date().toISOString(),
     };
     const updated = [newCustomer, ...customers];
@@ -337,11 +347,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currentShift = shifts.find((s) => s.isOpen) || null;
 
   const openShift = (openingCash: number): Shift => {
+    if (currentShift) {
+      throw new Error('لا يمكن فتح وردية جديدة قبل إغلاق الوردية الحالية');
+    }
+
     const newShift: Shift = {
       id: `shift_${Date.now()}`,
       userId: currentUser.id,
       userName: currentUser.displayName,
-      openTime: new Date().toISOString(),
+      openTime: getSafeTimestamp(),
       openingCash: Number(openingCash) || 0,
       totalSales: 0,
       totalCashSales: 0,
@@ -372,7 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const closed: Shift = {
       ...currentShift,
       isOpen: false,
-      closeTime: new Date().toISOString(),
+      closeTime: getSafeTimestamp(),
       closedBy: currentUser.displayName,
       closingCash: Number(closingCash),
       expectedCash: expected,
@@ -392,6 +406,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     walletProvider?: string,
     notes?: string
   ): DebtPayment => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تحصيل الديون');
+    }
+
     const targetCustomer = customers.find((c) => c.id === customerId);
     if (!targetCustomer) {
       throw new Error('Customer not found');
@@ -411,7 +429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       walletProvider,
       shiftId: currentShift ? currentShift.id : undefined,
       notes,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       cashierName: currentUser.displayName,
     };
 
@@ -469,6 +487,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     notes?: string,
     extra?: CheckoutExtraOptions
   ): Sale => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المبيعات');
+    }
+
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
     const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
     const total = Math.max(0, subtotal + taxAmount - (discount || 0));
@@ -476,7 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `${settings.invoicePrefix}-${nextInvNum}`;
     const saleId = `sale_${Date.now()}`;
-    const shiftId = currentShift ? currentShift.id : 'no_shift';
+    const shiftId = currentShift.id;
 
     const saleItems: SaleItem[] = items.map((ci, idx) => ({
       id: `si_${Date.now()}_${idx}`,
@@ -516,7 +538,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtotal,
       tax: taxAmount,
       discount: discount || 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       cashierName: currentUser.displayName,
       itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
@@ -584,7 +606,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             phone: extra.customerPhone?.trim() || '',
             totalDebt: creditRemainingDebt,
             notes: `تم إنشاء الحساب تلقائياً من فاتورة آجل #${invoiceNumber}`,
-            createdAt: new Date().toISOString(),
+            createdAt: getSafeTimestamp(),
             updatedAt: new Date().toISOString(),
           };
           saveCustomers([newCust, ...customers]);
@@ -626,6 +648,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saleId: string,
     refundedItems: { productId: string; quantity: number }[]
   ): Sale | null => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المرتجعات');
+    }
+
     const originalSale = sales.find((s) => s.id === saleId);
     if (!originalSale) return null;
 
@@ -659,13 +685,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtotal: refundTotal,
       tax: 0,
       discount: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       cashierName: currentUser.displayName,
       itemsCount: itemsToRefund.reduce((acc, i) => acc + i.quantity, 0),
       isRefund: true,
       originalSaleId: saleId,
-      shiftId: currentShift ? currentShift.id : 'no_shift',
+      shiftId: currentShift.id,
       paymentMethod: originalSale.paymentMethod,
       customerId: originalSale.customerId,
       customerName: originalSale.customerName,
@@ -749,10 +775,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addExpense = (item: Omit<Expense, 'id' | 'createdAt' | 'userId' | 'shiftId'>): Expense => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المصروفات');
+    }
+
     const newExpense: Expense = {
       ...item,
       id: `exp_${Date.now()}`,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       shiftId: currentShift ? currentShift.id : undefined,
     };
@@ -845,7 +875,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `shift_${Date.now()}`,
       userId: currentUser.id,
       userName: currentUser.displayName,
-      openTime: new Date().toISOString(),
+      openTime: getSafeTimestamp(),
       openingCash: 0,
       totalSales: 0,
       totalCashSales: 0,

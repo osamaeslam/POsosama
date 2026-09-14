@@ -120,7 +120,7 @@ export const SessionsScreen: React.FC = () => {
                   المسؤول (الكاشير): <strong className="text-slate-800">{currentShift.userName}</strong>
                 </span>
                 <span>
-                  وقت الفتح: <strong className="text-slate-800">{new Date(currentShift.openTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</strong>
+                  وقت الفتح: <strong className="text-slate-800">{new Date(currentShift.openTime).toLocaleString('ar-EG')}</strong>
                 </span>
               </p>
             </div>
@@ -287,12 +287,7 @@ export const SessionsScreen: React.FC = () => {
                         })}
                       </td>
                       <td className="p-3.5 text-slate-500 font-mono">
-                        {s.closeTime
-                          ? new Date(s.closeTime).toLocaleTimeString('ar-EG', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
+                        {s.closeTime ? new Date(s.closeTime).toLocaleString('ar-EG') : '—'}
                       </td>
                       <td className="p-3.5 text-left font-mono text-slate-600">
                         {s.openingCash.toLocaleString()} {settings.currency}
