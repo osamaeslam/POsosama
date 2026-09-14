@@ -25,6 +25,16 @@ function getBackupDirectory() {
   return path.join(app.getPath('userData'), 'backups')
 }
 
+const NORMALIZED_KEYS = {
+  products: 'bayaa_pos_products',
+  categories: 'bayaa_pos_categories',
+  sales: 'bayaa_pos_sales',
+  customers: 'bayaa_pos_customers',
+  expenses: 'bayaa_pos_expenses',
+  shifts: 'bayaa_pos_shifts',
+  debtPayments: 'bayaa_pos_debt_payments',
+}
+
 function openDatabase() {
   database = new Database(getDatabasePath())
   database.pragma('journal_mode = WAL')
@@ -41,7 +51,65 @@ function openDatabase() {
       created_at TEXT NOT NULL,
       payload TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY, barcode TEXT, name TEXT NOT NULL, category_id TEXT,
+      price REAL NOT NULL DEFAULT 0, wholesale_price REAL NOT NULL DEFAULT 0,
+      stock REAL NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, payload TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+    CREATE INDEX IF NOT EXISTS idx_products_name ON products(name COLLATE NOCASE);
+    CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS sales_records (id TEXT PRIMARY KEY, invoice_number TEXT, created_at TEXT NOT NULL, customer_id TEXT, total REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales_records(created_at);
+    CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales_records(customer_id);
+    CREATE TABLE IF NOT EXISTS sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT NOT NULL, product_id TEXT, quantity REAL NOT NULL, price REAL NOT NULL, subtotal REAL NOT NULL, payload TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+    CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, total_debt REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+    CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, amount REAL NOT NULL, shift_id TEXT, payload TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
+    CREATE TABLE IF NOT EXISTS shifts (id TEXT PRIMARY KEY, opened_at TEXT NOT NULL, closed_at TEXT, payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS debt_payments (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT NOT NULL, amount REAL NOT NULL, payload TEXT NOT NULL);
   `)
+  migrateNormalizedTables()
+}
+
+function asNumber(value) { return Number.isFinite(Number(value)) ? Number(value) : 0 }
+function asArray(value) { return Array.isArray(value) ? value : [] }
+
+function syncNormalizedData(key, value) {
+  if (!database || !Object.values(NORMALIZED_KEYS).includes(key)) return
+  const rows = asArray(value)
+  const tx = database.transaction(() => {
+    if (key === NORMALIZED_KEYS.products) {
+      database.prepare('DELETE FROM products').run()
+      const insert = database.prepare('INSERT INTO products (id, barcode, name, category_id, price, wholesale_price, stock, is_active, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      rows.forEach((row) => insert.run(row.id, row.barcode || null, row.name || '', row.categoryId || null, asNumber(row.price), asNumber(row.wholesalePrice), asNumber(row.stock), row.isActive === false ? 0 : 1, JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.categories) {
+      database.prepare('DELETE FROM categories').run()
+      const insert = database.prepare('INSERT INTO categories (id, name, payload) VALUES (?, ?, ?)')
+      rows.forEach((row) => insert.run(row.id, row.name || '', JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.sales) {
+      database.prepare('DELETE FROM sale_items').run(); database.prepare('DELETE FROM sales_records').run()
+      const saleInsert = database.prepare('INSERT INTO sales_records (id, invoice_number, created_at, customer_id, total, payload) VALUES (?, ?, ?, ?, ?, ?)')
+      const itemInsert = database.prepare('INSERT INTO sale_items (sale_id, product_id, quantity, price, subtotal, payload) VALUES (?, ?, ?, ?, ?, ?)')
+      rows.forEach((row) => { saleInsert.run(row.id, row.invoiceNumber || null, row.createdAt || '', row.customerId || null, asNumber(row.total), JSON.stringify(row)); asArray(row.items).forEach((item) => itemInsert.run(row.id, item.productId || null, asNumber(item.quantity), asNumber(item.price), asNumber(item.subtotal), JSON.stringify(item))) })
+    } else if (key === NORMALIZED_KEYS.customers) {
+      database.prepare('DELETE FROM customers').run(); const insert = database.prepare('INSERT INTO customers (id, name, phone, total_debt, payload) VALUES (?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.name || '', row.phone || null, asNumber(row.totalDebt), JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.expenses) {
+      database.prepare('DELETE FROM expenses').run(); const insert = database.prepare('INSERT INTO expenses (id, created_at, amount, shift_id, payload) VALUES (?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.createdAt || '', asNumber(row.amount), row.shiftId || null, JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.shifts) {
+      database.prepare('DELETE FROM shifts').run(); const insert = database.prepare('INSERT INTO shifts (id, opened_at, closed_at, payload) VALUES (?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.openedAt || '', row.closedAt || null, JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.debtPayments) {
+      database.prepare('DELETE FROM debt_payments').run(); const insert = database.prepare('INSERT INTO debt_payments (id, customer_id, created_at, amount, payload) VALUES (?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.customerId || null, row.createdAt || '', asNumber(row.amount), JSON.stringify(row)))
+    }
+  })
+  tx()
+}
+
+function migrateNormalizedTables() {
+  const rows = database.prepare('SELECT key, value FROM app_data WHERE key IN (?, ?, ?, ?, ?, ?, ?)').all(...Object.values(NORMALIZED_KEYS))
+  rows.forEach((row) => { try { syncNormalizedData(row.key, JSON.parse(row.value)) } catch (error) { console.error('Normalized migration failed:', error) } })
 }
 
 const MAX_BACKUPS = 90
@@ -126,6 +194,7 @@ function registerDatabaseHandlers() {
       INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
     `).run(key, JSON.stringify(value), now)
+    syncNormalizedData(key, value)
     event.returnValue = true
   })
 
@@ -146,6 +215,7 @@ function registerDatabaseHandlers() {
       INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
     `).run(key, serialized, now)
+    syncNormalizedData(key, value)
     return true
   })
 
