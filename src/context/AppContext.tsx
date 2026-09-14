@@ -104,6 +104,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const appStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = window.bayaaDesktop?.database
+  ? {
+      getItem: (key) => {
+        const databaseValue = window.bayaaDesktop?.database.getSync<string>(key);
+        if (databaseValue !== null && databaseValue !== undefined) return databaseValue;
+        return window.localStorage.getItem(key);
+      },
+      setItem: (key, value) => {
+        window.bayaaDesktop?.database.setSync(key, value);
+        window.localStorage.setItem(key, value);
+      },
+      removeItem: (key) => {
+        window.bayaaDesktop?.database.deleteSync(key);
+        window.localStorage.removeItem(key);
+      },
+    }
+  : window.localStorage;
+
 const STORAGE_KEYS = {
   LANG: 'bayaa_pos_lang',
   SETTINGS: 'bayaa_pos_settings',
@@ -117,18 +135,28 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'bayaa_pos_customers',
   DEBT_PAYMENTS: 'bayaa_pos_debt_payments',
   INITIALIZED: 'bayaa_pos_initialized_v2',
+  LAST_EVENT_TIME: 'bayaa_pos_last_event_time',
+};
+
+// Keeps local timestamps monotonic when an offline device clock is stale or moved backwards.
+const getSafeTimestamp = (): string => {
+  const now = Date.now();
+  const last = Number(appStorage.getItem(STORAGE_KEYS.LAST_EVENT_TIME) || 0);
+  const safeTime = Math.max(now, last + 1);
+  appStorage.setItem(STORAGE_KEYS.LAST_EVENT_TIME, String(safeTime));
+  return new Date(safeTime).toISOString();
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 1. Language
   const [language, setLanguageState] = useState<'ar' | 'en'>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.LANG);
+    const saved = appStorage.getItem(STORAGE_KEYS.LANG);
     return saved === 'en' ? 'en' : 'ar';
   });
 
   const setLanguage = (lang: 'ar' | 'en') => {
     setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEYS.LANG, lang);
+    appStorage.setItem(STORAGE_KEYS.LANG, lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   };
@@ -145,7 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 3. Store Settings
   const [settings, setSettings] = useState<StoreSettings>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    const saved = appStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -159,14 +187,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+      appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
       return updated;
     });
   };
 
   // 4. Users
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+    const saved = appStorage.getItem(STORAGE_KEYS.USERS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -178,7 +206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentUser, setCurrentUserState] = useState<User>(() => {
-    const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    const savedId = appStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
     if (savedId) {
       const found = users.find((u) => u.id === savedId);
       if (found) return found;
@@ -188,12 +216,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
+    appStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
   };
 
   // 5. Categories
   const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    const saved = appStorage.getItem(STORAGE_KEYS.CATEGORIES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -206,7 +234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 6. Products
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.PRODUCTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -214,19 +242,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialProducts;
+    return [];
   });
 
   const saveProducts = (newProducts: Product[]) => {
     setProducts(newProducts);
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
+    appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
   };
 
   const addProduct = (item: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Product => {
     const newProduct: Product = {
       ...item,
       id: String(Date.now()),
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       updatedAt: new Date().toISOString(),
     };
     const updated = [newProduct, ...products];
@@ -257,7 +285,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 7. Customers & Debts
   const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    const saved = appStorage.getItem(STORAGE_KEYS.CUSTOMERS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -265,12 +293,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialCustomers;
+    return [];
   });
 
   const saveCustomers = (newCustomers: Customer[]) => {
     setCustomers(newCustomers);
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(newCustomers));
+    appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(newCustomers));
   };
 
   const addCustomer = (item: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'totalDebt'>): Customer => {
@@ -278,7 +306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...item,
       id: `cust_${Date.now()}`,
       totalDebt: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       updatedAt: new Date().toISOString(),
     };
     const updated = [newCustomer, ...customers];
@@ -300,7 +328,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Debt Payments
   const [debtPayments, setDebtPayments] = useState<DebtPayment[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.DEBT_PAYMENTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.DEBT_PAYMENTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -313,12 +341,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveDebtPayments = (newPayments: DebtPayment[]) => {
     setDebtPayments(newPayments);
-    localStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(newPayments));
+    appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(newPayments));
   };
 
   // 8. Shifts
   const [shifts, setShifts] = useState<Shift[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SHIFTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.SHIFTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -326,22 +354,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialShifts;
+    return [];
   });
 
   const saveShifts = (newShifts: Shift[]) => {
     setShifts(newShifts);
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(newShifts));
+    appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(newShifts));
   };
 
   const currentShift = shifts.find((s) => s.isOpen) || null;
 
   const openShift = (openingCash: number): Shift => {
+    if (currentShift) {
+      throw new Error('لا يمكن فتح وردية جديدة قبل إغلاق الوردية الحالية');
+    }
+
     const newShift: Shift = {
       id: `shift_${Date.now()}`,
       userId: currentUser.id,
       userName: currentUser.displayName,
-      openTime: new Date().toISOString(),
+      openTime: getSafeTimestamp(),
       openingCash: Number(openingCash) || 0,
       totalSales: 0,
       totalCashSales: 0,
@@ -372,7 +404,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const closed: Shift = {
       ...currentShift,
       isOpen: false,
-      closeTime: new Date().toISOString(),
+      closeTime: getSafeTimestamp(),
       closedBy: currentUser.displayName,
       closingCash: Number(closingCash),
       expectedCash: expected,
@@ -392,6 +424,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     walletProvider?: string,
     notes?: string
   ): DebtPayment => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تحصيل الديون');
+    }
+
     const targetCustomer = customers.find((c) => c.id === customerId);
     if (!targetCustomer) {
       throw new Error('Customer not found');
@@ -411,7 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       walletProvider,
       shiftId: currentShift ? currentShift.id : undefined,
       notes,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       cashierName: currentUser.displayName,
     };
 
@@ -445,7 +481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 10. Sales / Invoices
   const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SALES);
+    const saved = appStorage.getItem(STORAGE_KEYS.SALES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -453,12 +489,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSales;
+    return [];
   });
 
   const saveSales = (newSales: Sale[]) => {
     setSales(newSales);
-    localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
+    appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
   };
 
   const checkoutCart = (
@@ -469,6 +505,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     notes?: string,
     extra?: CheckoutExtraOptions
   ): Sale => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المبيعات');
+    }
+
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
     const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
     const total = Math.max(0, subtotal + taxAmount - (discount || 0));
@@ -476,7 +516,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `${settings.invoicePrefix}-${nextInvNum}`;
     const saleId = `sale_${Date.now()}`;
-    const shiftId = currentShift ? currentShift.id : 'no_shift';
+    const shiftId = currentShift.id;
 
     const saleItems: SaleItem[] = items.map((ci, idx) => ({
       id: `si_${Date.now()}_${idx}`,
@@ -516,7 +556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtotal,
       tax: taxAmount,
       discount: discount || 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       cashierName: currentUser.displayName,
       itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
@@ -584,7 +624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             phone: extra.customerPhone?.trim() || '',
             totalDebt: creditRemainingDebt,
             notes: `تم إنشاء الحساب تلقائياً من فاتورة آجل #${invoiceNumber}`,
-            createdAt: new Date().toISOString(),
+            createdAt: getSafeTimestamp(),
             updatedAt: new Date().toISOString(),
           };
           saveCustomers([newCust, ...customers]);
@@ -626,6 +666,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saleId: string,
     refundedItems: { productId: string; quantity: number }[]
   ): Sale | null => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المرتجعات');
+    }
+
     const originalSale = sales.find((s) => s.id === saleId);
     if (!originalSale) return null;
 
@@ -659,13 +703,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtotal: refundTotal,
       tax: 0,
       discount: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       cashierName: currentUser.displayName,
       itemsCount: itemsToRefund.reduce((acc, i) => acc + i.quantity, 0),
       isRefund: true,
       originalSaleId: saleId,
-      shiftId: currentShift ? currentShift.id : 'no_shift',
+      shiftId: currentShift.id,
       paymentMethod: originalSale.paymentMethod,
       customerId: originalSale.customerId,
       customerName: originalSale.customerName,
@@ -732,7 +776,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 11. Expenses
   const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+    const saved = appStorage.getItem(STORAGE_KEYS.EXPENSES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -740,19 +784,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialExpenses;
+    return [];
   });
 
   const saveExpenses = (newExpenses: Expense[]) => {
     setExpenses(newExpenses);
-    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(newExpenses));
+    appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(newExpenses));
   };
 
   const addExpense = (item: Omit<Expense, 'id' | 'createdAt' | 'userId' | 'shiftId'>): Expense => {
+    if (!currentShift) {
+      throw new Error('يجب فتح وردية قبل تسجيل المصروفات');
+    }
+
     const newExpense: Expense = {
       ...item,
       id: `exp_${Date.now()}`,
-      createdAt: new Date().toISOString(),
+      createdAt: getSafeTimestamp(),
       userId: currentUser.id,
       shiftId: currentShift ? currentShift.id : undefined,
     };
@@ -807,7 +855,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (data.categories && Array.isArray(data.categories)) {
         setCategories(data.categories);
-        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
+        appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
       }
       if (data.customers && Array.isArray(data.customers)) {
         saveCustomers(data.customers);
@@ -845,7 +893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `shift_${Date.now()}`,
       userId: currentUser.id,
       userName: currentUser.displayName,
-      openTime: new Date().toISOString(),
+      openTime: getSafeTimestamp(),
       openingCash: 0,
       totalSales: 0,
       totalCashSales: 0,
@@ -860,18 +908,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllData = () => {
-    saveProducts(initialProducts);
-    setCategories(initialCategories);
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
-    saveCustomers(initialCustomers);
-    saveDebtPayments(initialDebtPayments);
-    saveSales(initialSales);
-    saveShifts(initialShifts);
-    saveExpenses(initialExpenses);
-    setSettings(initialStoreSettings);
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialStoreSettings));
-    setUsers(initialUsers);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+    saveProducts([]);
+    setCategories([]);
+    appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+    saveCustomers([]);
+    saveDebtPayments([]);
+    saveSales([]);
+    saveShifts([]);
+    saveExpenses([]);
   };
 
   return (

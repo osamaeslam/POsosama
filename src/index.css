@@ -21,6 +21,45 @@
     margin: 0.5cm;
     size: auto;
   }
+
+  .print-thermal {
+    position: static !important;
+    display: block !important;
+    width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  .print-thermal > .no-print {
+    display: none !important;
+  }
+
+  .print-thermal > :not(.no-print) {
+    display: block !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  .print-thermal table {
+    width: 100% !important;
+  }
+
+  @page thermal {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  .print-thermal {
+    page: thermal;
+  }
 }
 
 @media screen {
