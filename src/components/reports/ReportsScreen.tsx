@@ -68,6 +68,9 @@ export const ReportsScreen: React.FC = () => {
     .filter((s) => s.paymentMethod === 'wallet')
     .reduce((sum, s) => sum + s.total, 0);
 
+  const cardSalesTotal = creditSalesTotal + walletSalesTotal;
+  const totalRevenue = grossSalesRevenue;
+
   // Top selling products
   const productSalesMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
 
