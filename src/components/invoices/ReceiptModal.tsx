@@ -103,7 +103,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 overflow-y-auto flex-1 font-mono text-xs">
           {printFormat === 'thermal' ? (
             /* 80mm Receipt Look */
-            <div className="max-w-[320px] mx-auto bg-white p-4 shadow-xs rounded-xl border border-slate-200 text-slate-800">
+            <div className="w-full max-w-[302px] mx-auto bg-white p-3 shadow-xs rounded-xl border border-slate-200 text-slate-900 text-[12px] leading-relaxed">
               {/* Store Header */}
               <div className="text-center pb-3 border-b border-dashed border-slate-300">
                 <div className="font-extrabold text-base text-slate-900 font-sans">{settings.storeName}</div>
@@ -300,8 +300,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
                       <td className="p-2 text-[11px] text-slate-500">{it.productBarcode || '-'}</td>
                       <td className="p-2 font-sans font-semibold">{it.productName}</td>
                       <td className="p-2 text-center font-bold">{it.quantity}</td>
-                      <td className="p-2 text-left">{it.price.toLocaleString()} {settings.currency}</td>
-                      <td className="p-2 text-left font-bold">{it.subtotal.toLocaleString()} {settings.currency}</td>
+<td className="p-2 text-left font-semibold whitespace-nowrap">{it.price.toLocaleString()} {settings.currency}</td>
+              <td className="p-2 text-left font-extrabold whitespace-nowrap">{it.subtotal.toLocaleString()} {settings.currency}</td>
                     </tr>
                   ))}
                 </tbody>
