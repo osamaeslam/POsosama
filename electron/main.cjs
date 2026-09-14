@@ -182,6 +182,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
+    show: false,
     backgroundColor: '#f1f5f9',
     autoHideMenuBar: true,
     webPreferences: {
@@ -191,6 +192,9 @@ function createWindow() {
       sandbox: false,
     },
   })
+
+  mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.on('unresponsive', () => console.error('Electron renderer became unresponsive'))
 
   if (process.env.ELECTRON_START_URL) {
     mainWindow.loadURL(process.env.ELECTRON_START_URL)

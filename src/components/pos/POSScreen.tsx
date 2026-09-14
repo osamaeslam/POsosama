@@ -136,6 +136,19 @@ export const POSScreen: React.FC = () => {
     });
   };
 
+  const updateItemPrice = (productId: string, nextPrice: number) => {
+    if (!Number.isFinite(nextPrice) || nextPrice < 0) return;
+    setCart((prev) => prev.map((item) => item.product.id === productId
+      ? { ...item, price: nextPrice, subtotal: nextPrice * item.quantity }
+      : item
+    ));
+  };
+
+  const setWholesalePrice = (productId: string) => {
+    const item = cart.find((cartItem) => cartItem.product.id === productId);
+    if (item) updateItemPrice(productId, Number(item.product.wholesalePrice) || 0);
+  };
+
   // Update item quantity
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) =>
@@ -474,13 +487,31 @@ export const POSScreen: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <h5 className="font-bold text-slate-900 truncate">{item.product.name}</h5>
                   <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                    <span>
-                      {item.price.toLocaleString()} {settings.currency}
-                    </span>
                     <span>× {item.quantity}</span>
                     <span className="font-mono text-[10px] text-slate-400">
                       ({item.product.barcode})
                     </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setWholesalePrice(item.product.id)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${item.price === item.product.wholesalePrice ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-600 hover:border-amber-300'}`}
+                    >
+                      جملة: {item.product.wholesalePrice.toLocaleString()}
+                    </button>
+                    <label className="flex items-center gap-1 text-[10px] text-slate-500">
+                      سعر مخصص
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.price}
+                        onChange={(event) => updateItemPrice(item.product.id, Number(event.target.value))}
+                        aria-label={`سعر مخصص لـ ${item.product.name}`}
+                        className="w-20 px-1.5 py-1 rounded-md border border-slate-200 bg-white text-left font-bold text-slate-800"
+                      />
+                    </label>
                   </div>
                 </div>
 
