@@ -44,14 +44,74 @@ function openDatabase() {
   `)
 }
 
+const MAX_BACKUPS = 90
+const MAX_BACKUP_AGE_DAYS = 365
+
+function pruneBackups() {
+  const backupDirectory = getBackupDirectory()
+  if (!fs.existsSync(backupDirectory)) return
+  const cutoff = Date.now() - MAX_BACKUP_AGE_DAYS * 24 * 60 * 60 * 1000
+  const backups = fs.readdirSync(backupDirectory)
+    .filter((file) => /^bayaa-pos-.*\.sqlite$/.test(file))
+    .map((file) => {
+      const fullPath = path.join(backupDirectory, file)
+      return { file, fullPath, stat: fs.statSync(fullPath) }
+    })
+    .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs)
+
+  backups.slice(MAX_BACKUPS).forEach(({ fullPath }) => {
+    try { fs.unlinkSync(fullPath) } catch (error) { console.error('Backup cleanup failed:', error) }
+  })
+  backups.slice(0, MAX_BACKUPS).forEach(({ fullPath, stat }) => {
+    if (stat.mtimeMs < cutoff) {
+      try { fs.unlinkSync(fullPath) } catch (error) { console.error('Expired backup cleanup failed:', error) }
+    }
+  })
+}
+
 function createBackup() {
   if (!database || database.open === false) return null
   const backupDirectory = getBackupDirectory()
   fs.mkdirSync(backupDirectory, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const destination = path.join(backupDirectory, `bayaa-pos-${stamp}.sqlite`)
+  database.pragma('wal_checkpoint(PASSIVE)')
   database.backup(destination)
+  pruneBackups()
   return destination
+}
+
+function validateSqliteFile(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return false
+  try {
+    const candidate = new Database(filePath, { readonly: true, fileMustExist: true })
+    const row = candidate.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_data'").get()
+    candidate.close()
+    return Boolean(row)
+  } catch (error) {
+    console.error('SQLite validation failed:', error)
+    return false
+  }
+}
+
+async function restoreDatabase() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'استعادة قاعدة بيانات SQLite',
+    properties: ['openFile'],
+    filters: [{ name: 'SQLite database', extensions: ['sqlite', 'db'] }],
+  })
+  if (result.canceled || !result.filePaths[0]) return null
+  const source = result.filePaths[0]
+  if (!validateSqliteFile(source)) throw new Error('ملف قاعدة البيانات غير صالح')
+  const databasePath = getDatabasePath()
+  const restorePath = `${databasePath}.restore-${Date.now()}`
+  fs.copyFileSync(source, restorePath)
+  if (database) database.close()
+  fs.copyFileSync(restorePath, databasePath)
+  fs.unlinkSync(restorePath)
+  app.relaunch()
+  app.exit(0)
+  return true
 }
 
 function registerDatabaseHandlers() {
@@ -95,6 +155,7 @@ function registerDatabaseHandlers() {
   })
 
   ipcMain.handle('db:backup', () => createBackup())
+  ipcMain.handle('app:restore-backup', () => restoreDatabase())
   ipcMain.handle('app:print', async () => {
     if (!mainWindow) return false
     return new Promise((resolve) => {

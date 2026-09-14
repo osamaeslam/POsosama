@@ -40,6 +40,25 @@ export const SettingsScreen: React.FC = () => {
   const [receiptFooter, setReceiptFooter] = useState(settings.receiptFooter);
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+  const [backupMessage, setBackupMessage] = useState('');
+
+  const desktopApp = window.bayaaDesktop;
+
+  const handleExportSqlite = async () => {
+    if (!desktopApp) return;
+    const path = await desktopApp.app.exportBackup();
+    setBackupMessage(path ? 'تم تصدير قاعدة البيانات كاملة بنجاح.' : 'تم إلغاء التصدير.');
+  };
+
+  const handleRestoreSqlite = async () => {
+    if (!desktopApp) return;
+    if (!confirm('سيتم استبدال كل بيانات النظام بقاعدة البيانات المختارة ثم إعادة تشغيل التطبيق. هل تريد المتابعة؟')) return;
+    try {
+      await desktopApp.app.restoreBackup();
+    } catch (error) {
+      setBackupMessage('فشل الاستعادة: ملف SQLite غير صالح أو تالف.');
+    }
+  };
 
   // New User Modal State
   const [isAddUserModal, setIsAddUserModal] = useState(false);
@@ -321,8 +340,30 @@ export const SettingsScreen: React.FC = () => {
               <span>تصدير نسخة احتياطية (JSON)</span>
             </button>
 
-            {/* Import Button */}
-            <label className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200">
+              {backupMessage && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+                  {backupMessage}
+                </div>
+              )}
+
+              {desktopApp && (
+                <>
+                  <button type="button" onClick={handleExportSqlite} className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer">
+                    <Download className="w-4 h-4" />
+                    <span>تصدير قاعدة SQLite كاملة</span>
+                  </button>
+                  <button type="button" onClick={handleRestoreSqlite} className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border border-rose-200">
+                    <Upload className="w-4 h-4" />
+                    <span>استعادة قاعدة SQLite كاملة</span>
+                  </button>
+                  <button type="button" onClick={() => desktopApp.app.openBackups()} className="w-full py-2 px-4 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition-all cursor-pointer">
+                    فتح مجلد النسخ الاحتياطية
+                  </button>
+                </>
+              )}
+
+              {/* Import Button */}
+              <label className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200">
               <Upload className="w-4 h-4" />
               <span>استعادة نسخة احتياطية من ملف</span>
               <input
@@ -359,7 +400,7 @@ export const SettingsScreen: React.FC = () => {
           <div className="bg-slate-900 text-white rounded-2xl p-5 text-xs space-y-2">
             <div className="flex items-center gap-2 text-emerald-400 font-bold">
               <ShieldCheck className="w-4 h-4" />
-              <span>تطبيق محلي 100% دون خادم سحابي</span>
+              <span>تطبيق محلي 100% دون خا��م سحابي</span>
             </div>
             <p className="text-slate-300 text-[11px] leading-relaxed">
               جميع بياناتك الحساسة كالأسعار، التكلفة، سجلات المبيعات والعملاء مخزنة في متصفحك أو جهازك دون إرسالها لأي خادم خارجي.

@@ -322,8 +322,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteCustomer = (id: string) => {
-    const updated = customers.filter((c) => c.id !== id);
-    saveCustomers(updated);
+    const customer = customers.find((c) => c.id === id);
+    if (!customer) return;
+    if ((customer.totalDebt || 0) > 0) {
+      throw new Error('لا يمكن حذف عميل عليه رصيد مستحق');
+    }
+    const hasHistory = sales.some((sale) => sale.customerId === id) || debtPayments.some((payment) => payment.customerId === id);
+    if (hasHistory) {
+      throw new Error('لا يمكن حذف عميل لديه فواتير أو تحصيلات سابقة');
+    }
+    saveCustomers(customers.filter((c) => c.id !== id));
   };
 
   // Debt Payments
@@ -437,8 +445,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('Customer not found');
     }
 
-    const payAmount = Math.min(amount, targetCustomer.totalDebt || amount);
-    const receiptNumber = `REC-${Date.now().toString().slice(-6)}`;
+  const requestedAmount = Number(amount);
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+    throw new Error('مبلغ التحصيل غير صحيح');
+  }
+  const outstandingDebt = Math.max(0, Number(targetCustomer.totalDebt) || 0);
+  if (outstandingDebt <= 0) {
+    throw new Error('لا يوجد رصيد مستحق على هذا العميل');
+  }
+  const payAmount = Math.min(requestedAmount, outstandingDebt);
+  const receiptNumber = `REC-${Date.now().toString().slice(-6)}`;
 
     const newPayment: DebtPayment = {
       id: `dp_${Date.now()}`,
@@ -511,6 +527,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Sale => {
     if (!currentShift) {
       throw new Error('يجب فتح وردية قبل تسجيل المبيعات');
+    }
+
+    for (const item of items) {
+      const quantity = Number(item.quantity);
+      const stock = Number(item.product.stock);
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw new Error('كمية الصنف غير صحيحة');
+      }
+      if (Number.isFinite(stock) && quantity > stock) {
+        throw new Error(`الكمية المطلوبة من ${item.product.name} أكبر من المخزون المتاح`);
+      }
     }
 
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
@@ -682,15 +709,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     refundedItems.forEach(({ productId, quantity }) => {
       const originalItem = originalSale.items.find((i) => i.productId === productId);
-      if (originalItem && quantity > 0) {
-        const itemRefundTotal = originalItem.price * quantity;
+      const safeQuantity = Number(quantity);
+      const alreadyRefunded = originalItem?.refundedQuantity || 0;
+      const refundableQuantity = originalItem ? Math.max(0, originalItem.quantity - alreadyRefunded) : 0;
+      if (originalItem && Number.isInteger(safeQuantity) && safeQuantity > 0 && safeQuantity <= refundableQuantity) {
+        const itemRefundTotal = originalItem.price * safeQuantity;
         refundTotal += itemRefundTotal;
         itemsToRefund.push({
           ...originalItem,
           id: `ref_item_${Date.now()}_${productId}`,
-          quantity,
+          quantity: safeQuantity,
           subtotal: itemRefundTotal,
-          refundedQuantity: quantity,
+          refundedQuantity: safeQuantity,
         });
       }
     });
@@ -723,7 +753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 1. Restore product stock
     const updatedProducts = products.map((p) => {
-      const returned = refundedItems.find((ri) => ri.productId === p.id);
+      const returned = itemsToRefund.find((item) => item.productId === p.id);
       if (returned) {
         return {
           ...p,
@@ -741,9 +771,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const updatedItems = s.items.map((item) => {
           const ret = refundedItems.find((ri) => ri.productId === item.productId);
           if (ret) {
+            const refundableQuantity = Math.max(0, item.quantity - (item.refundedQuantity || 0));
+            const safeQuantity = Math.min(Math.max(0, Math.floor(Number(ret.quantity) || 0)), refundableQuantity);
             return {
               ...item,
-              refundedQuantity: item.refundedQuantity + ret.quantity,
+              refundedQuantity: (item.refundedQuantity || 0) + safeQuantity,
             };
           }
           return item;
@@ -822,15 +854,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteExpense = (id: string) => {
+    const expense = expenses.find((e) => e.id === id);
+    if (!expense) return;
     const updated = expenses.filter((e) => e.id !== id);
     saveExpenses(updated);
+    if (expense.shiftId) {
+      saveShifts(
+        shifts.map((shift) =>
+          shift.id === expense.shiftId
+            ? { ...shift, totalExpenses: Math.max(0, shift.totalExpenses - expense.amount) }
+            : shift
+        )
+      );
+    }
   };
 
   // 12. Backup, Restore & Reset
   const exportDataJson = () => {
     const payload = {
       appName: 'Bayaa POS',
-      version: '2.0.0',
+      version: '2.1.0',
       exportDate: new Date().toISOString(),
       settings,
       users,
@@ -842,43 +885,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       shifts,
       expenses,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `bayaa-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const importDataJson = (jsonString: string): boolean => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.products && Array.isArray(data.products)) {
-        saveProducts(data.products);
+      const collections = ['users', 'categories', 'products', 'customers', 'debtPayments', 'sales', 'shifts', 'expenses'];
+      if (!data || data.appName !== 'Bayaa POS' || collections.some((key) => !Array.isArray(data[key]))) {
+        throw new Error('Invalid or incomplete Bayaa POS backup');
       }
-      if (data.categories && Array.isArray(data.categories)) {
-        setCategories(data.categories);
-        appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
+      if (!data.settings || typeof data.settings !== 'object') {
+        throw new Error('Backup settings are missing');
       }
-      if (data.customers && Array.isArray(data.customers)) {
-        saveCustomers(data.customers);
-      }
-      if (data.debtPayments && Array.isArray(data.debtPayments)) {
-        saveDebtPayments(data.debtPayments);
-      }
-      if (data.sales && Array.isArray(data.sales)) {
-        saveSales(data.sales);
-      }
-      if (data.shifts && Array.isArray(data.shifts)) {
-        saveShifts(data.shifts);
-      }
-      if (data.expenses && Array.isArray(data.expenses)) {
-        saveExpenses(data.expenses);
-      }
-      if (data.settings) {
-        updateSettings(data.settings);
-      }
+
+      const values = {
+        users: data.users,
+        categories: data.categories,
+        products: data.products,
+        customers: data.customers,
+        debtPayments: data.debtPayments,
+        sales: data.sales,
+        shifts: data.shifts,
+        expenses: data.expenses,
+      };
+      appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(values.users));
+      appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(values.categories));
+      appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(values.products));
+      appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(values.customers));
+      appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(values.debtPayments));
+      appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(values.sales));
+      appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(values.shifts));
+      appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(values.expenses));
+      appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+      window.location.reload();
       return true;
     } catch (err) {
       console.error('Failed to import JSON backup', err);
