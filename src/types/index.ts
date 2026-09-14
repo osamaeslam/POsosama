@@ -40,7 +40,8 @@ export interface Product {
   barcode: string;
   name: string;
   price: number;
-  minPrice: number;
+  /** Kept optional so older local backups remain readable. */
+  minPrice?: number;
   wholesalePrice: number;
   cost: number;
   stock: number;
@@ -55,7 +56,7 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
-  price: number; // can be adjusted within minPrice
+  price: number; // selling price selected for this cart line
   discount: number; // per item discount
   subtotal: number;
 }

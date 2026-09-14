@@ -49,7 +49,7 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 border-b border-slate-800/80 flex items-center gap-3">
         <img
           src="/assets/icon.png"
-          alt="Bayaa POS"
+          alt="Osama POS"
           className="w-9 h-9 rounded-lg object-contain bg-blue-500/10 p-1"
           onError={(e) => {
             (e.target as HTMLElement).style.display = 'none';

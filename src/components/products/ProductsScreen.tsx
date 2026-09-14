@@ -104,7 +104,6 @@ export const ProductsScreen: React.FC = () => {
         price: parsedPrice,
         cost: parsedCost,
         wholesalePrice: parsedWholesale,
-        minPrice: parsedCost,
         stock: parsedStock,
         minStock: parsedMinStock,
       });
@@ -116,7 +115,6 @@ export const ProductsScreen: React.FC = () => {
         price: parsedPrice,
         cost: parsedCost,
         wholesalePrice: parsedWholesale,
-        minPrice: parsedCost,
         stock: parsedStock,
         minStock: parsedMinStock,
         isActive: true,

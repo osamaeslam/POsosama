@@ -337,6 +337,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currentShift = shifts.find((s) => s.isOpen) || null;
 
   const openShift = (openingCash: number): Shift => {
+    if (currentShift) {
+      throw new Error('There is already an open shift');
+    }
+    const safeOpeningCash = Number(openingCash);
+    if (!Number.isFinite(safeOpeningCash) || safeOpeningCash < 0) {
+      throw new Error('Opening cash must be a non-negative number');
+    }
     const newShift: Shift = {
       id: `shift_${Date.now()}`,
       userId: currentUser.id,
@@ -469,6 +476,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     notes?: string,
     extra?: CheckoutExtraOptions
   ): Sale => {
+    if (!currentShift) {
+      throw new Error('Open a shift before completing a sale');
+    }
+    if (!items.length || items.some((item) => item.quantity <= 0 || item.quantity > item.product.stock)) {
+      throw new Error('Cart contains invalid quantities');
+    }
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
     const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
     const total = Math.max(0, subtotal + taxAmount - (discount || 0));
@@ -634,7 +647,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     refundedItems.forEach(({ productId, quantity }) => {
       const originalItem = originalSale.items.find((i) => i.productId === productId);
-      if (originalItem && quantity > 0) {
+      const alreadyRefunded = originalItem?.refundedQuantity || 0;
+      const remainingQuantity = originalItem ? originalItem.quantity - alreadyRefunded : 0;
+      if (originalItem && quantity > 0 && quantity <= remainingQuantity) {
         const itemRefundTotal = originalItem.price * quantity;
         refundTotal += itemRefundTotal;
         itemsToRefund.push({
@@ -770,15 +785,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteExpense = (id: string) => {
-    const updated = expenses.filter((e) => e.id !== id);
-    saveExpenses(updated);
+    const expense = expenses.find((item) => item.id === id);
+    if (!expense) return;
+    saveExpenses(expenses.filter((item) => item.id !== id));
+    if (currentShift && expense.shiftId === currentShift.id) {
+      saveShifts(
+        shifts.map((shift) =>
+          shift.id === currentShift.id
+            ? { ...shift, totalExpenses: Math.max(0, shift.totalExpenses - expense.amount) }
+            : shift
+        )
+      );
+    }
   };
 
   // 12. Backup, Restore & Reset
   const exportDataJson = () => {
     const payload = {
-      appName: 'Bayaa POS',
-      version: '2.0.0',
+      appName: 'Osama POS',
+      version: '3.0.0',
       exportDate: new Date().toISOString(),
       settings,
       users,

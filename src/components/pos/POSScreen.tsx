@@ -191,6 +191,16 @@ export const POSScreen: React.FC = () => {
     if (cart.length === 0) return;
     setCheckoutError(null);
 
+    if (!currentShift) {
+      setCheckoutError('يجب فتح وردية قبل إتمام البيع.');
+      return;
+    }
+
+    if (paymentMethod === 'cash' && parsedCashReceived < grandTotal) {
+      setCheckoutError('المبلغ المستلم أقل من إجمالي الفاتورة.');
+      return;
+    }
+
     // If credit payment, validate customer
     let targetCustomerId: string | undefined = undefined;
     let targetCustomerName: string | undefined = undefined;

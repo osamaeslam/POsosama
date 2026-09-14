@@ -60,8 +60,9 @@ export const Header: React.FC = () => {
   };
 
   const drawerCash = currentShift
-    ? currentShift.openingCash +
-      currentShift.totalSales -
+    ?       currentShift.openingCash +
+      currentShift.totalCashSales +
+      currentShift.totalDebtCollectionsCash -
       currentShift.totalRefunds -
       currentShift.totalExpenses
     : 0;
@@ -84,7 +85,7 @@ export const Header: React.FC = () => {
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm overflow-hidden shrink-0">
             <img
               src="/assets/iconr.png"
-              alt="Bayaa"
+              alt="Osama POS"
               className="w-8 h-8 object-contain"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
@@ -350,7 +351,7 @@ export const Header: React.FC = () => {
 
             <div className="space-y-3.5 text-xs text-slate-600 leading-relaxed">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 font-medium">
-                ✅ <strong>نعم، البرنامج مهيأ ليعمل أوفلاين كبرنامج ديسكتوب متكامل</strong> ويحفظ كافة العمليات محلياً على جهازك دون إنترنت.
+                ✅ <strong>نعم، البرنامج مهيأ ليعمل أوفلاين كبرنامج ديسكتوب مت��امل</strong> ويحفظ كافة العمليات محلياً على جهازك دون إنترنت.
               </div>
 
               <div className="space-y-2">

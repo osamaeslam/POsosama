@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Bayaa POS - بياع لإدارة نقاط البيع",
-  "short_name": "بياع POS",
-  "description": "نظام نقاط البيع وإدارة التجزئة والمخزون والمبيعات محلياً بدون إنترنت",
+  "name": "Osama POS - نظام نقاط البيع",
+  "short_name": "Osama POS",
+  "description": "نظام نقاط البيع وإدارة المخزون والمبيعات محلياً بدون إنترنت",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
