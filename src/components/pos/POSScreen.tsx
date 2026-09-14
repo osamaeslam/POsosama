@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CartItem, Product, Sale } from '../../types';
 import {
@@ -71,18 +71,30 @@ export const POSScreen: React.FC = () => {
     barcodeInputRef.current?.focus();
   }, []);
 
-  // Filter products
-  const filteredProducts = products.filter((product) => {
-    if (!product.isActive) return false;
-    const matchesCategory =
-      selectedCategory === 'all' || product.categoryId === selectedCategory;
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !query ||
-      product.name.toLowerCase().includes(query) ||
-      (product.barcode && product.barcode.toLowerCase().includes(query));
-    return matchesCategory && matchesSearch;
-  });
+  // Normalize Arabic/Latin input so keyboard and scanner searches behave consistently.
+  const normalizeSearch = (value: string) => value
+    .toLocaleLowerCase('ar-EG')
+    .normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[\s\-_/\\.]+/g, '');
+
+  const filteredProducts = useMemo(() => {
+    const query = normalizeSearch(searchQuery);
+    return products
+      .filter((product) => product.isActive && (selectedCategory === 'all' || product.categoryId === selectedCategory))
+      .map((product) => ({ product, name: normalizeSearch(product.name), barcode: normalizeSearch(product.barcode || '') }))
+      .filter(({ name, barcode }) => !query || name.includes(query) || barcode.includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aExact = a.barcode === query || a.name === query;
+        const bExact = b.barcode === query || b.name === query;
+        return Number(bExact) - Number(aExact);
+      })
+      .map(({ product }) => product);
+  }, [products, searchQuery, selectedCategory]);
 
   // Add product to cart
   const addToCart = (product: Product) => {
@@ -159,9 +171,10 @@ export const POSScreen: React.FC = () => {
     e.preventDefault();
     const code = barcodeInput.trim();
     if (!code) return;
+    const normalizedCode = normalizeSearch(code);
 
     const matched = products.find(
-      (p) => p.barcode?.toLowerCase() === code.toLowerCase() && p.isActive
+      (p) => normalizeSearch(p.barcode || '') === normalizedCode && p.isActive
     );
 
     if (matched) {

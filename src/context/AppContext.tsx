@@ -873,7 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const exportDataJson = () => {
     const payload = {
       appName: 'Bayaa POS',
-      version: '2.0.0',
+      version: '2.1.0',
       exportDate: new Date().toISOString(),
       settings,
       users,
@@ -885,43 +885,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       shifts,
       expenses,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `bayaa-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const importDataJson = (jsonString: string): boolean => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.products && Array.isArray(data.products)) {
-        saveProducts(data.products);
+      const collections = ['users', 'categories', 'products', 'customers', 'debtPayments', 'sales', 'shifts', 'expenses'];
+      if (!data || data.appName !== 'Bayaa POS' || collections.some((key) => !Array.isArray(data[key]))) {
+        throw new Error('Invalid or incomplete Bayaa POS backup');
       }
-      if (data.categories && Array.isArray(data.categories)) {
-        setCategories(data.categories);
-        appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
+      if (!data.settings || typeof data.settings !== 'object') {
+        throw new Error('Backup settings are missing');
       }
-      if (data.customers && Array.isArray(data.customers)) {
-        saveCustomers(data.customers);
-      }
-      if (data.debtPayments && Array.isArray(data.debtPayments)) {
-        saveDebtPayments(data.debtPayments);
-      }
-      if (data.sales && Array.isArray(data.sales)) {
-        saveSales(data.sales);
-      }
-      if (data.shifts && Array.isArray(data.shifts)) {
-        saveShifts(data.shifts);
-      }
-      if (data.expenses && Array.isArray(data.expenses)) {
-        saveExpenses(data.expenses);
-      }
-      if (data.settings) {
-        updateSettings(data.settings);
-      }
+
+      const values = {
+        users: data.users,
+        categories: data.categories,
+        products: data.products,
+        customers: data.customers,
+        debtPayments: data.debtPayments,
+        sales: data.sales,
+        shifts: data.shifts,
+        expenses: data.expenses,
+      };
+      appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(values.users));
+      appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(values.categories));
+      appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(values.products));
+      appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(values.customers));
+      appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(values.debtPayments));
+      appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(values.sales));
+      appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(values.shifts));
+      appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(values.expenses));
+      appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+      window.location.reload();
       return true;
     } catch (err) {
       console.error('Failed to import JSON backup', err);
