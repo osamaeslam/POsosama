@@ -29,6 +29,30 @@
     min-height: 0;
   }
 
+  .app-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-main h1,
+  .app-main h2,
+  .app-main h3,
+  .app-main p,
+  .app-main span,
+  .app-main td,
+  .app-main th {
+    overflow-wrap: anywhere;
+  }
+
+  .app-main [class*="grid"] {
+    min-width: 0;
+  }
+
+  .app-main [class*="overflow-x-auto"] {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+  }
+
   @media (max-width: 1100px) {
     .app-shell {
       font-size: 0.94rem;

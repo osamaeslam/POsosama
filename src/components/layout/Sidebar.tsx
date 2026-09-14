@@ -44,7 +44,7 @@ export const Sidebar: React.FC = () => {
   const isManager = currentUser.role === 'admin' || currentUser.role === 'manager';
 
   return (
-    <aside className="no-print w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800 select-none">
+    <aside className="no-print w-64 max-w-[35vw] bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800 select-none">
       {/* Brand area */}
       <div className="p-4 border-b border-slate-800/80 flex items-center gap-3">
         <img

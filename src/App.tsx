@@ -52,7 +52,7 @@ const MainAppContent: React.FC = () => {
       {/* Main viewport */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-hidden relative flex flex-col">
+        <main className="app-main flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden relative flex flex-col">
           {renderActiveScreen()}
         </main>
       </div>
