@@ -276,11 +276,11 @@ export const SettingsScreen: React.FC = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                      {u.name.charAt(0)}
+                      {(u.displayName || u.username || '؟').charAt(0)}
                     </div>
                     <div>
                       <div className="font-bold text-slate-900 flex items-center gap-2">
-                        <span>{u.name}</span>
+                        <span>{u.displayName || u.username || 'مستخدم'}</span>
                         {u.id === currentUser.id && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
                             الحالي
