@@ -104,6 +104,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const appStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = window.bayaaDesktop?.database
+  ? {
+      getItem: (key) => {
+        const databaseValue = window.bayaaDesktop?.database.getSync<string>(key);
+        if (databaseValue !== null && databaseValue !== undefined) return databaseValue;
+        return window.localStorage.getItem(key);
+      },
+      setItem: (key, value) => {
+        window.bayaaDesktop?.database.setSync(key, value);
+        window.localStorage.setItem(key, value);
+      },
+      removeItem: (key) => {
+        window.bayaaDesktop?.database.deleteSync(key);
+        window.localStorage.removeItem(key);
+      },
+    }
+  : window.localStorage;
+
 const STORAGE_KEYS = {
   LANG: 'bayaa_pos_lang',
   SETTINGS: 'bayaa_pos_settings',
@@ -123,22 +141,22 @@ const STORAGE_KEYS = {
 // Keeps local timestamps monotonic when an offline device clock is stale or moved backwards.
 const getSafeTimestamp = (): string => {
   const now = Date.now();
-  const last = Number(localStorage.getItem(STORAGE_KEYS.LAST_EVENT_TIME) || 0);
+  const last = Number(appStorage.getItem(STORAGE_KEYS.LAST_EVENT_TIME) || 0);
   const safeTime = Math.max(now, last + 1);
-  localStorage.setItem(STORAGE_KEYS.LAST_EVENT_TIME, String(safeTime));
+  appStorage.setItem(STORAGE_KEYS.LAST_EVENT_TIME, String(safeTime));
   return new Date(safeTime).toISOString();
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 1. Language
   const [language, setLanguageState] = useState<'ar' | 'en'>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.LANG);
+    const saved = appStorage.getItem(STORAGE_KEYS.LANG);
     return saved === 'en' ? 'en' : 'ar';
   });
 
   const setLanguage = (lang: 'ar' | 'en') => {
     setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEYS.LANG, lang);
+    appStorage.setItem(STORAGE_KEYS.LANG, lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   };
@@ -155,7 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 3. Store Settings
   const [settings, setSettings] = useState<StoreSettings>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    const saved = appStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -169,14 +187,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+      appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
       return updated;
     });
   };
 
   // 4. Users
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+    const saved = appStorage.getItem(STORAGE_KEYS.USERS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -188,7 +206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentUser, setCurrentUserState] = useState<User>(() => {
-    const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    const savedId = appStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
     if (savedId) {
       const found = users.find((u) => u.id === savedId);
       if (found) return found;
@@ -198,12 +216,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
+    appStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
   };
 
   // 5. Categories
   const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    const saved = appStorage.getItem(STORAGE_KEYS.CATEGORIES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -216,7 +234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 6. Products
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.PRODUCTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -229,7 +247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveProducts = (newProducts: Product[]) => {
     setProducts(newProducts);
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
+    appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
   };
 
   const addProduct = (item: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Product => {
@@ -267,7 +285,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 7. Customers & Debts
   const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    const saved = appStorage.getItem(STORAGE_KEYS.CUSTOMERS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -280,7 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveCustomers = (newCustomers: Customer[]) => {
     setCustomers(newCustomers);
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(newCustomers));
+    appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(newCustomers));
   };
 
   const addCustomer = (item: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'totalDebt'>): Customer => {
@@ -310,7 +328,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Debt Payments
   const [debtPayments, setDebtPayments] = useState<DebtPayment[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.DEBT_PAYMENTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.DEBT_PAYMENTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -323,12 +341,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveDebtPayments = (newPayments: DebtPayment[]) => {
     setDebtPayments(newPayments);
-    localStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(newPayments));
+    appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(newPayments));
   };
 
   // 8. Shifts
   const [shifts, setShifts] = useState<Shift[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SHIFTS);
+    const saved = appStorage.getItem(STORAGE_KEYS.SHIFTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -341,7 +359,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveShifts = (newShifts: Shift[]) => {
     setShifts(newShifts);
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(newShifts));
+    appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(newShifts));
   };
 
   const currentShift = shifts.find((s) => s.isOpen) || null;
@@ -463,7 +481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 10. Sales / Invoices
   const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SALES);
+    const saved = appStorage.getItem(STORAGE_KEYS.SALES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -476,7 +494,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveSales = (newSales: Sale[]) => {
     setSales(newSales);
-    localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
+    appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
   };
 
   const checkoutCart = (
@@ -758,7 +776,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 11. Expenses
   const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+    const saved = appStorage.getItem(STORAGE_KEYS.EXPENSES);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -771,7 +789,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveExpenses = (newExpenses: Expense[]) => {
     setExpenses(newExpenses);
-    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(newExpenses));
+    appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(newExpenses));
   };
 
   const addExpense = (item: Omit<Expense, 'id' | 'createdAt' | 'userId' | 'shiftId'>): Expense => {
@@ -837,7 +855,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (data.categories && Array.isArray(data.categories)) {
         setCategories(data.categories);
-        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
+        appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
       }
       if (data.customers && Array.isArray(data.customers)) {
         saveCustomers(data.customers);
@@ -892,16 +910,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetAllData = () => {
     saveProducts(initialProducts);
     setCategories(initialCategories);
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
+    appStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
     saveCustomers(initialCustomers);
     saveDebtPayments(initialDebtPayments);
     saveSales(initialSales);
     saveShifts(initialShifts);
     saveExpenses(initialExpenses);
     setSettings(initialStoreSettings);
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialStoreSettings));
+    appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialStoreSettings));
     setUsers(initialUsers);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+    appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
   };
 
   return (

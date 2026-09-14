@@ -44,6 +44,25 @@ function createBackup() {
 }
 
 function registerDatabaseHandlers() {
+  ipcMain.on('db:get-sync', (event, key) => {
+    const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
+    event.returnValue = row ? JSON.parse(row.value) : null
+  })
+
+  ipcMain.on('db:set-sync', (event, key, value) => {
+    const now = new Date().toISOString()
+    database.prepare(`
+      INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, JSON.stringify(value), now)
+    event.returnValue = true
+  })
+
+  ipcMain.on('db:delete-sync', (event, key) => {
+    database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
+    event.returnValue = true
+  })
+
   ipcMain.handle('db:get', (_event, key) => {
     const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
     return row ? JSON.parse(row.value) : null
