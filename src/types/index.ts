@@ -148,7 +148,8 @@ export interface Shift {
   totalWalletSales: number; // Sales via E-Wallet (not in drawer)
   totalCreditSales: number; // Sales on debt/credit (not in drawer)
   totalRefunds: number; // Cash refunded
-  totalExpenses: number; // Cash expenses taken from drawer
+  totalExpenses: number; // Total cash expenses and payouts taken from drawer
+  totalSupplierPayoutsCash?: number; // Cash payouts specifically for supplier invoices/vouchers
   expectedCash?: number; // openingCash + totalCashSales + totalDebtCollectionsCash - totalRefunds - totalExpenses
   cashDifference?: number;
   isOpen: boolean;

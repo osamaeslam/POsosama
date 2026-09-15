@@ -427,7 +427,7 @@ export const SupplierInvoiceModal: React.FC<SupplierInvoiceModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 إدراج الصنف في الفاتورة
@@ -452,7 +452,7 @@ export const SupplierInvoiceModal: React.FC<SupplierInvoiceModalProps> = ({
               </div>
             ) : (
               <div className="overflow-x-auto max-h-56">
-                <table className="w-full text-right text-xs">
+                <table className="w-full text-right text-xs min-w-[520px]">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 sticky top-0">
                     <tr>
                       <th className="py-2 px-3">#</th>
@@ -650,15 +650,15 @@ export const SupplierInvoiceModal: React.FC<SupplierInvoiceModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
-          <div className="text-xs text-slate-500">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-50 shrink-0">
+          <div className="text-xs text-slate-500 w-full sm:w-auto text-center sm:text-right">
             {items.length} أصناف • الإجمالي: <b className="text-slate-800">{invoiceTotal.toLocaleString()}</b> {settings.currency}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer text-center"
             >
               إلغاء
             </button>
@@ -666,7 +666,7 @@ export const SupplierInvoiceModal: React.FC<SupplierInvoiceModalProps> = ({
               type="button"
               onClick={handleSubmitInvoice}
               disabled={items.length === 0}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all ${
+              className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all ${
                 items.length === 0
                   ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'

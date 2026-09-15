@@ -511,6 +511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalCreditSales: 0,
       totalRefunds: 0,
       totalExpenses: 0,
+      totalSupplierPayoutsCash: 0,
       isOpen: true,
     };
     const updated = [newShift, ...shifts];
@@ -523,11 +524,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('No open shift to close');
     }
     const expected =
-      currentShift.openingCash +
-      currentShift.totalCashSales +
-      currentShift.totalDebtCollectionsCash -
-      currentShift.totalRefunds -
-      currentShift.totalExpenses;
+      Number(currentShift.openingCash || 0) +
+      Number(currentShift.totalCashSales || 0) +
+      Number(currentShift.totalDebtCollectionsCash || 0) -
+      Number(currentShift.totalRefunds || 0) -
+      Number(currentShift.totalExpenses || 0);
     const countedCash = Number(closingCash);
     if (!Number.isFinite(countedCash) || countedCash < 0) {
       throw new Error('أدخل مبلغ النقدية الفعلي بشكل صحيح');
@@ -825,16 +826,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // 3. If paid from cash drawer during open shift, record cash deduction!
-    if (invoiceData.paidFromCashDrawer && paidAmount > 0 && currentShift) {
+    const isCashDrawerDeduction = Boolean(
+      invoiceData.paidFromCashDrawer &&
+      invoiceData.paymentMethod === 'cash' &&
+      paidAmount > 0 &&
+      currentShift
+    );
+
+    if (isCashDrawerDeduction && currentShift) {
       const updatedShifts = shifts.map((s) =>
         s.id === currentShift.id
           ? {
               ...s,
               totalExpenses: (s.totalExpenses || 0) + paidAmount,
+              totalSupplierPayoutsCash: (s.totalSupplierPayoutsCash || 0) + paidAmount,
             }
           : s
       );
       saveShifts(updatedShifts);
+
+      const supExpense: Expense = {
+        id: `exp_sup_${Date.now()}`,
+        title: `فاتورة توريد: ${invoiceData.supplierName} (${invoiceNumber})`,
+        amount: paidAmount,
+        category: 'supplies',
+        notes: `دفعة نقدية مسددة من درج الكاشير لفاتورة الشراء رقم ${invoiceNumber}`,
+        createdAt: getSafeTimestamp(),
+        userId: currentUser.id,
+        shiftId: currentShift.id,
+      };
+      saveExpenses([supExpense, ...expenses]);
     }
 
     // 4. Save Invoice
@@ -868,6 +889,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const payAmount = Math.min(requestedAmount, currentPayable);
     const receiptNumber = `VCH-SUP-${Date.now().toString().slice(-6)}`;
 
+    const isCashDrawerDeduction = Boolean(
+      paidFromCashDrawer &&
+      paymentMethod === 'cash' &&
+      payAmount > 0 &&
+      currentShift
+    );
+
     const payment: SupplierPayment = {
       id: `sup_pay_${Date.now()}`,
       receiptNumber,
@@ -875,7 +903,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       supplierName: targetSupplier.name,
       amount: payAmount,
       paymentMethod,
-      paidFromCashDrawer,
+      paidFromCashDrawer: isCashDrawerDeduction,
       shiftId: currentShift ? currentShift.id : undefined,
       notes,
       createdAt: getSafeTimestamp(),
@@ -894,16 +922,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveSupplierPayments([payment, ...supplierPayments]);
 
     // 3. If paid from cash drawer during open shift, record cash expense!
-    if (paidFromCashDrawer && currentShift && paymentMethod === 'cash') {
+    if (isCashDrawerDeduction && currentShift) {
       const updatedShifts = shifts.map((s) =>
         s.id === currentShift.id
           ? {
               ...s,
               totalExpenses: (s.totalExpenses || 0) + payAmount,
+              totalSupplierPayoutsCash: (s.totalSupplierPayoutsCash || 0) + payAmount,
             }
           : s
       );
       saveShifts(updatedShifts);
+
+      const supExpense: Expense = {
+        id: `exp_sup_pay_${Date.now()}`,
+        title: `سند صرف لمورد: ${targetSupplier.name} (${receiptNumber})`,
+        amount: payAmount,
+        category: 'supplies',
+        notes: `سداد دفعة مديونية لمورد من درج الكاشير بموجب سند رقم ${receiptNumber}`,
+        createdAt: getSafeTimestamp(),
+        userId: currentUser.id,
+        shiftId: currentShift.id,
+      };
+      saveExpenses([supExpense, ...expenses]);
     }
 
     return payment;
@@ -1376,6 +1417,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalCreditSales: 0,
       totalRefunds: 0,
       totalExpenses: 0,
+      totalSupplierPayoutsCash: 0,
       isOpen: true,
     };
     saveShifts([freshShift]);

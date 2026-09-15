@@ -44,6 +44,8 @@ export const SessionsScreen: React.FC = () => {
   const debtCollections = currentShift?.totalDebtCollectionsCash || 0;
   const refunds = currentShift?.totalRefunds || 0;
   const currentExpenses = currentShift?.totalExpenses || 0;
+  const supplierPayouts = currentShift?.totalSupplierPayoutsCash || 0;
+  const generalExpenses = Math.max(0, currentExpenses - supplierPayouts);
   const openingCash = currentShift?.openingCash || 0;
 
   const expectedCashInDrawer = currentShift
@@ -138,7 +140,7 @@ export const SessionsScreen: React.FC = () => {
             <div className="text-xs font-bold text-slate-700 mb-2.5">
               تفاصيل حركة الخزينة الفعلية للوردية (ما يدخل وما يخرج من الدرج):
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
               {/* 1. Opening Cash */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-slate-500 font-semibold block">العهدة الافتتاحية:</span>
@@ -172,16 +174,28 @@ export const SessionsScreen: React.FC = () => {
                 <div className="text-[10px] text-blue-600/80 mt-0.5">كاش تم تحصيله من العملاء</div>
               </div>
 
-              {/* 4. Expenses */}
+              {/* 4. General Expenses */}
               <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-200">
                 <span className="text-rose-800 font-semibold flex items-center gap-1">
                   <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" />
-                  <span>مصروفات من الدرج:</span>
+                  <span>مصروفات ونثريات:</span>
                 </span>
                 <div className="text-base font-bold text-rose-700 mt-1 font-mono">
-                  -{currentExpenses.toLocaleString()} {settings.currency}
+                  -{generalExpenses.toLocaleString()} {settings.currency}
                 </div>
-                <div className="text-[10px] text-rose-600/80 mt-0.5">فواتير ونثريات منصرفة</div>
+                <div className="text-[10px] text-rose-600/80 mt-0.5">فواتير ونثريات تشغيلية</div>
+              </div>
+
+              {/* 5. Supplier Payouts */}
+              <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 col-span-2 sm:col-span-1">
+                <span className="text-indigo-800 font-semibold flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>سداد موردين ومشتريات:</span>
+                </span>
+                <div className="text-base font-bold text-indigo-700 mt-1 font-mono">
+                  -{supplierPayouts.toLocaleString()} {settings.currency}
+                </div>
+                <div className="text-[10px] text-indigo-600/80 mt-0.5">مدفوعات من نقدية الدرج</div>
               </div>
             </div>
           </div>
@@ -258,7 +272,7 @@ export const SessionsScreen: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
+            <table className="w-full text-right text-xs min-w-[850px]">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                 <tr>
                   <th className="p-3.5">الكاشير</th>

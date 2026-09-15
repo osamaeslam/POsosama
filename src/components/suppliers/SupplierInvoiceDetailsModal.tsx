@@ -143,7 +143,7 @@ export const SupplierInvoiceDetailsModal: React.FC<SupplierInvoiceDetailsModalPr
               <span className="text-slate-500">({invoice.items.length} صنف)</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
+              <table className="w-full text-right text-xs min-w-[500px]">
                 <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                   <tr>
                     <th className="py-2.5 px-3">#</th>
@@ -213,22 +213,22 @@ export const SupplierInvoiceDetailsModal: React.FC<SupplierInvoiceDetailsModalPr
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
           <button
             type="button"
             onClick={handlePrint}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="flex-1 sm:flex-initial px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
           >
             <Printer className="w-4 h-4" />
             طباعة إذن التوريد
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             {invoice.remainingDebt > 0 && onPayRemaining && (
               <button
                 type="button"
                 onClick={onPayRemaining}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-600/20"
+                className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-600/20"
               >
                 <DollarSign className="w-4 h-4" />
                 سداد دفعة للمورد
@@ -237,7 +237,7 @@ export const SupplierInvoiceDetailsModal: React.FC<SupplierInvoiceDetailsModalPr
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer text-center"
             >
               إغلاق
             </button>

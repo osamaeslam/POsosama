@@ -141,14 +141,14 @@ export const SuppliersScreen: React.FC = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => {
                 setSelectedSupplierForEdit(null);
                 setShowEditSupplierModal(true);
               }}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 text-slate-500" />
               إضافة مورد جديد
@@ -156,7 +156,7 @@ export const SuppliersScreen: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowNewInvoiceModal(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
             >
               <Receipt className="w-4 h-4" />
               + تسجيل فاتورة توريد جديدة
@@ -216,15 +216,15 @@ export const SuppliersScreen: React.FC = () => {
         </div>
 
         {/* Sub Navigation Tabs */}
-        <div className="flex items-center justify-between border-t border-slate-100 pt-3 flex-wrap gap-2">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between border-t border-slate-100 pt-3 gap-3">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
             <button
               type="button"
               onClick={() => {
                 setActiveSubTab('invoices');
                 setStatusFilter('all');
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeSubTab === 'invoices' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -236,7 +236,7 @@ export const SuppliersScreen: React.FC = () => {
                 setActiveSubTab('suppliers');
                 setStatusFilter('all');
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeSubTab === 'suppliers' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -248,7 +248,7 @@ export const SuppliersScreen: React.FC = () => {
                 setActiveSubTab('vouchers');
                 setStatusFilter('all');
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeSubTab === 'vouchers' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -257,7 +257,7 @@ export const SuppliersScreen: React.FC = () => {
           </div>
 
           {/* Search Bar & Filter */}
-          <div className="flex items-center gap-2 flex-1 sm:max-w-md justify-end">
+          <div className="flex items-center gap-2 w-full lg:max-w-md justify-end">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
               <input
@@ -279,7 +279,7 @@ export const SuppliersScreen: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none shrink-0"
               >
                 <option value="all">كل الحالات</option>
                 <option value="paid">مسددة بالكامل</option>
@@ -315,97 +315,189 @@ export const SuppliersScreen: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4">رقم الفاتورة</th>
-                      <th className="py-3 px-4">مرجع المورد</th>
-                      <th className="py-3 px-4">المورد التجاري</th>
-                      <th className="py-3 px-4">التاريخ</th>
-                      <th className="py-3 px-4">الأصناف</th>
-                      <th className="py-3 px-4">الإجمالي</th>
-                      <th className="py-3 px-4">المدفوع</th>
-                      <th className="py-3 px-4">المتبقي (الآجل)</th>
-                      <th className="py-3 px-4">حالة السداد</th>
-                      <th className="py-3 px-4 text-center">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredInvoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3 px-4 font-mono font-black text-indigo-700">{inv.invoiceNumber}</td>
-                        <td className="py-3 px-4 font-mono text-slate-500">{inv.supplierInvoiceRef || '—'}</td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-800">{inv.supplierName}</div>
-                          {inv.supplierPhone && (
-                            <div className="text-[10px] text-slate-400 font-mono">{inv.supplierPhone}</div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-slate-500">
-                          {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 font-semibold">{inv.items.length} صنف</td>
-                        <td className="py-3 px-4 font-bold text-slate-800">
-                          {inv.totalAmount.toLocaleString()} {settings.currency}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-emerald-700">
-                          {inv.paidAmount.toLocaleString()} {settings.currency}
-                        </td>
-                        <td className="py-3 px-4 font-black text-rose-600">
-                          {inv.remainingDebt.toLocaleString()} {settings.currency}
-                        </td>
-                        <td className="py-3 px-4">
-                          {inv.paymentStatus === 'paid' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                              <CheckCircle className="w-3 h-3" />
-                              مسددة
-                            </span>
-                          ) : inv.paymentStatus === 'partial' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              <Clock className="w-3 h-3" />
-                              سداد جزئي
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                              <AlertCircle className="w-3 h-3" />
-                              آجل
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedInvoiceForDetails(inv);
-                                setShowDetailsModal(true);
-                              }}
-                              className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                              title="عرض تفاصيل الفاتورة وطباعة إذن التوريد"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              عرض
-                            </button>
+            <div className="space-y-3">
+              {/* Mobile Cards View (md:hidden) */}
+              <div className="md:hidden space-y-3">
+                {filteredInvoices.map((inv) => (
+                  <div key={inv.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-indigo-700 text-xs">{inv.invoiceNumber}</span>
+                        {inv.supplierInvoiceRef && (
+                          <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                            {inv.supplierInvoiceRef}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        {inv.paymentStatus === 'paid' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            <CheckCircle className="w-3 h-3" />
+                            مسددة
+                          </span>
+                        ) : inv.paymentStatus === 'partial' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                            <Clock className="w-3 h-3" />
+                            سداد جزئي
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                            <AlertCircle className="w-3 h-3" />
+                            آجل
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                            {inv.remainingDebt > 0 && (
+                    <div>
+                      <div className="font-bold text-slate-800 text-sm">{inv.supplierName}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {new Date(inv.createdAt).toLocaleDateString('ar-EG')} • {inv.items.length} أصناف
+                        {inv.supplierPhone && ` • هاتف: ${inv.supplierPhone}`}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-xl text-center text-xs">
+                      <div>
+                        <div className="text-[10px] text-slate-500 mb-0.5">الإجمالي</div>
+                        <div className="font-bold text-slate-800 font-mono">
+                          {inv.totalAmount.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-emerald-600 mb-0.5">المدفوع</div>
+                        <div className="font-bold text-emerald-700 font-mono">
+                          {inv.paidAmount.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-rose-500 mb-0.5">المتبقي</div>
+                        <div className="font-black text-rose-600 font-mono">
+                          {inv.remainingDebt.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedInvoiceForDetails(inv);
+                          setShowDetailsModal(true);
+                        }}
+                        className="flex-1 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        عرض التفاصيل
+                      </button>
+                      {inv.remainingDebt > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPayForSupplier(inv.supplierId)}
+                          className="flex-1 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <DollarSign className="w-3.5 h-3.5" />
+                          سداد دفعة
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (hidden md:block) */}
+              <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs min-w-[800px]">
+                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4">رقم الفاتورة</th>
+                        <th className="py-3 px-4">مرجع المورد</th>
+                        <th className="py-3 px-4">المورد التجاري</th>
+                        <th className="py-3 px-4">التاريخ</th>
+                        <th className="py-3 px-4">الأصناف</th>
+                        <th className="py-3 px-4">الإجمالي</th>
+                        <th className="py-3 px-4">المدفوع</th>
+                        <th className="py-3 px-4">المتبقي (الآجل)</th>
+                        <th className="py-3 px-4">حالة السداد</th>
+                        <th className="py-3 px-4 text-center">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredInvoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3 px-4 font-mono font-black text-indigo-700">{inv.invoiceNumber}</td>
+                          <td className="py-3 px-4 font-mono text-slate-500">{inv.supplierInvoiceRef || '—'}</td>
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-800">{inv.supplierName}</div>
+                            {inv.supplierPhone && (
+                              <div className="text-[10px] text-slate-400 font-mono">{inv.supplierPhone}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-slate-500">
+                            {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 font-semibold">{inv.items.length} صنف</td>
+                          <td className="py-3 px-4 font-bold text-slate-800">
+                            {inv.totalAmount.toLocaleString()} {settings.currency}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-emerald-700">
+                            {inv.paidAmount.toLocaleString()} {settings.currency}
+                          </td>
+                          <td className="py-3 px-4 font-black text-rose-600">
+                            {inv.remainingDebt.toLocaleString()} {settings.currency}
+                          </td>
+                          <td className="py-3 px-4">
+                            {inv.paymentStatus === 'paid' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                <CheckCircle className="w-3 h-3" />
+                                مسددة
+                              </span>
+                            ) : inv.paymentStatus === 'partial' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                <Clock className="w-3 h-3" />
+                                سداد جزئي
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                <AlertCircle className="w-3 h-3" />
+                                آجل
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleOpenPayForSupplier(inv.supplierId)}
-                                className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                                title="سداد دفعة للمورد"
+                                onClick={() => {
+                                  setSelectedInvoiceForDetails(inv);
+                                  setShowDetailsModal(true);
+                                }}
+                                className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                title="عرض تفاصيل الفاتورة وطباعة إذن التوريد"
                               >
-                                <DollarSign className="w-3.5 h-3.5" />
-                                سداد
+                                <Eye className="w-3.5 h-3.5" />
+                                عرض
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                              {inv.remainingDebt > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayForSupplier(inv.supplierId)}
+                                  className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                  title="سداد دفعة للمورد"
+                                >
+                                  <DollarSign className="w-3.5 h-3.5" />
+                                  سداد
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -559,56 +651,102 @@ export const SuppliersScreen: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4">رقم السند</th>
-                      <th className="py-3 px-4">المورد التجاري</th>
-                      <th className="py-3 px-4">التاريخ والوقت</th>
-                      <th className="py-3 px-4">المبلغ المسدد</th>
-                      <th className="py-3 px-4">طريقة السداد</th>
-                      <th className="py-3 px-4">درج النقدية</th>
-                      <th className="py-3 px-4">المسؤول</th>
-                      <th className="py-3 px-4">ملاحظات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredPayments.map((pay) => (
-                      <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3 px-4 font-mono font-black text-emerald-700">{pay.receiptNumber}</td>
-                        <td className="py-3 px-4 font-bold text-slate-800">{pay.supplierName}</td>
-                        <td className="py-3 px-4 text-slate-500">
-                          {new Date(pay.createdAt).toLocaleString('ar-EG')}
-                        </td>
-                        <td className="py-3 px-4 font-black text-slate-900 text-sm">
-                          {pay.amount.toLocaleString()} {settings.currency}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-semibold text-slate-700">
-                            {pay.paymentMethod === 'cash'
-                              ? 'نقدي (كاش)'
-                              : pay.paymentMethod === 'bank'
-                              ? 'تحويل بنكي'
-                              : 'محفظة إلكترونية'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          {pay.paidFromCashDrawer ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md text-[10px]">
-                              خصم من الدرج
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 text-[10px]">خارج الدرج</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 font-medium">{pay.userName}</td>
-                        <td className="py-3 px-4 text-slate-500 text-[11px]">{pay.notes || '—'}</td>
+            <div className="space-y-3">
+              {/* Mobile Cards View (md:hidden) */}
+              <div className="md:hidden space-y-3">
+                {filteredPayments.map((pay) => (
+                  <div key={pay.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-black text-emerald-700 text-xs">{pay.receiptNumber}</span>
+                      <span className="text-base font-black text-slate-900 font-mono">
+                        {pay.amount.toLocaleString()} {settings.currency}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="font-bold text-slate-800">{pay.supplierName}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {new Date(pay.createdAt).toLocaleDateString('ar-EG')}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                      <span className="text-slate-600 font-medium">
+                        {pay.paymentMethod === 'cash'
+                          ? 'نقدي (كاش)'
+                          : pay.paymentMethod === 'bank'
+                          ? 'تحويل بنكي'
+                          : 'محفظة إلكترونية'}
+                      </span>
+                      {pay.paidFromCashDrawer ? (
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md text-[10px]">
+                          خصم من الدرج
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">خارج الدرج</span>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                      <span>المسؤول: {pay.userName}</span>
+                      {pay.notes && <span className="text-slate-500 font-normal truncate max-w-[180px]">{pay.notes}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (hidden md:block) */}
+              <div className="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs min-w-[760px]">
+                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4">رقم السند</th>
+                        <th className="py-3 px-4">المورد التجاري</th>
+                        <th className="py-3 px-4">التاريخ والوقت</th>
+                        <th className="py-3 px-4">المبلغ المسدد</th>
+                        <th className="py-3 px-4">طريقة السداد</th>
+                        <th className="py-3 px-4">درج النقدية</th>
+                        <th className="py-3 px-4">المسؤول</th>
+                        <th className="py-3 px-4">ملاحظات</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPayments.map((pay) => (
+                        <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3 px-4 font-mono font-black text-emerald-700">{pay.receiptNumber}</td>
+                          <td className="py-3 px-4 font-bold text-slate-800">{pay.supplierName}</td>
+                          <td className="py-3 px-4 text-slate-500">
+                            {new Date(pay.createdAt).toLocaleString('ar-EG')}
+                          </td>
+                          <td className="py-3 px-4 font-black text-slate-900 text-sm">
+                            {pay.amount.toLocaleString()} {settings.currency}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-semibold text-slate-700">
+                              {pay.paymentMethod === 'cash'
+                                ? 'نقدي (كاش)'
+                                : pay.paymentMethod === 'bank'
+                                ? 'تحويل بنكي'
+                                : 'محفظة إلكترونية'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {pay.paidFromCashDrawer ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md text-[10px]">
+                                خصم من الدرج
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">خارج الدرج</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 font-medium">{pay.userName}</td>
+                          <td className="py-3 px-4 text-slate-500 text-[11px]">{pay.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
