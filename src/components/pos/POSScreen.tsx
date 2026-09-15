@@ -211,9 +211,9 @@ export const POSScreen: React.FC = () => {
   const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
   const grandTotal = Math.max(0, subtotal + taxAmount - discountAmount);
 
-  const parsedCashReceived = parseFloat(cashReceived) || grandTotal;
+  const parsedCashReceived = Number(cashReceived);
   const changeDue =
-    paymentMethod === 'cash' && parsedCashReceived > grandTotal
+    paymentMethod === 'cash' && Number.isFinite(parsedCashReceived) && parsedCashReceived > grandTotal
       ? parsedCashReceived - grandTotal
       : 0;
 

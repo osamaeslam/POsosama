@@ -988,11 +988,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
-    const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
-    const total = Math.max(0, subtotal + taxAmount - (discount || 0));
+  if (!['cash', 'credit', 'wallet'].includes(paymentMethod)) {
+    throw new Error('طريقة الدفع غير مدعومة. استخدم نقدي أو آجل أو محفظة إلكترونية');
+  }
 
-    const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
+  const subtotal = items.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+  const safeDiscount = Number(discount || 0);
+  if (!Number.isFinite(safeDiscount) || safeDiscount < 0 || safeDiscount > subtotal) {
+    throw new Error('قيمة الخصم غير صحيحة');
+  }
+  const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
+  const total = Math.max(0, subtotal + taxAmount - safeDiscount);
+
+  if (paymentMethod === 'cash') {
+    const received = Number(cashReceived);
+    if (!Number.isFinite(received) || received < total) {
+      throw new Error('المبلغ المستلم نقداً أقل من إجمالي الفاتورة');
+    }
+  }
+
+  if (paymentMethod === 'wallet' && !extra?.walletProvider?.trim()) {
+    throw new Error('يرجى تحديد المحفظة الإلكترونية');
+  }
+
+  const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `${settings.invoicePrefix}-${nextInvNum}`;
     const saleId = `sale_${Date.now()}`;
     const shiftId = currentShift.id;
@@ -1022,11 +1041,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       changeDue = cashReceived && cashReceived > total ? cashReceived - total : 0;
     } else if (paymentMethod === 'wallet') {
       cashPaidIntoDrawer = 0;
-    } else if (paymentMethod === 'credit') {
-      creditPaidAmount = Math.max(0, Number(extra?.creditPaidAmount) || 0);
-      creditRemainingDebt = Math.max(0, total - creditPaidAmount);
-      cashPaidIntoDrawer = creditPaidAmount; // cash received upfront
-    }
+  } else if (paymentMethod === 'credit') {
+  const requestedAdvance = Number(extra?.creditPaidAmount || 0);
+  if (!Number.isFinite(requestedAdvance) || requestedAdvance < 0 || requestedAdvance > total) {
+    throw new Error('المبلغ المدفوع مقدماً غير صحيح');
+  }
+  creditPaidAmount = requestedAdvance;
+  creditRemainingDebt = total - creditPaidAmount;
+  cashPaidIntoDrawer = creditPaidAmount; // الدفعة المقدمة نقدية وتدخل درج الكاشير
+  }
 
     const newSale: Sale = {
       id: saleId,
