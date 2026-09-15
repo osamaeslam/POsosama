@@ -1,11 +1,40 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
-const Database = require('better-sqlite3')
+
+let Database = null
+try {
+  Database = require('better-sqlite3')
+} catch (err) {
+  console.warn('better-sqlite3 not available, using robust JSON file storage fallback:', err.message)
+}
 
 let mainWindow
 let database
 let backupTimer
+let jsonStore = {}
+const jsonStorePath = () => path.join(app.getPath('userData'), 'osama-pos-data.json')
+
+function loadJsonStore() {
+  try {
+    const file = jsonStorePath()
+    if (fs.existsSync(file)) {
+      jsonStore = JSON.parse(fs.readFileSync(file, 'utf-8'))
+    }
+  } catch (e) {
+    console.error('Failed to read JSON store:', e)
+    jsonStore = {}
+  }
+}
+
+function saveJsonStore() {
+  try {
+    const file = jsonStorePath()
+    fs.writeFileSync(file, JSON.stringify(jsonStore, null, 2), 'utf-8')
+  } catch (e) {
+    console.error('Failed to write JSON store:', e)
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -36,42 +65,51 @@ const NORMALIZED_KEYS = {
 }
 
 function openDatabase() {
-  database = new Database(getDatabasePath())
-  database.pragma('journal_mode = WAL')
-  database.pragma('foreign_keys = ON')
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS app_data (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_type TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      payload TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY, barcode TEXT, name TEXT NOT NULL, category_id TEXT,
-      price REAL NOT NULL DEFAULT 0, wholesale_price REAL NOT NULL DEFAULT 0,
-      stock REAL NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, payload TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
-    CREATE INDEX IF NOT EXISTS idx_products_name ON products(name COLLATE NOCASE);
-    CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, payload TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS sales_records (id TEXT PRIMARY KEY, invoice_number TEXT, created_at TEXT NOT NULL, customer_id TEXT, total REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
-    CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales_records(created_at);
-    CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales_records(customer_id);
-    CREATE TABLE IF NOT EXISTS sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT NOT NULL, product_id TEXT, quantity REAL NOT NULL, price REAL NOT NULL, subtotal REAL NOT NULL, payload TEXT NOT NULL);
-    CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
-    CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, total_debt REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
-    CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
-    CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, amount REAL NOT NULL, shift_id TEXT, payload TEXT NOT NULL);
-    CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
-    CREATE TABLE IF NOT EXISTS shifts (id TEXT PRIMARY KEY, opened_at TEXT NOT NULL, closed_at TEXT, payload TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS debt_payments (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT NOT NULL, amount REAL NOT NULL, payload TEXT NOT NULL);
-  `)
-  migrateNormalizedTables()
+  if (Database) {
+    try {
+      database = new Database(getDatabasePath())
+      database.pragma('journal_mode = WAL')
+      database.pragma('foreign_keys = ON')
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS app_data (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_type TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          payload TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY, barcode TEXT, name TEXT NOT NULL, category_id TEXT,
+          price REAL NOT NULL DEFAULT 0, wholesale_price REAL NOT NULL DEFAULT 0,
+          stock REAL NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, payload TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+        CREATE INDEX IF NOT EXISTS idx_products_name ON products(name COLLATE NOCASE);
+        CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, payload TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS sales_records (id TEXT PRIMARY KEY, invoice_number TEXT, created_at TEXT NOT NULL, customer_id TEXT, total REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales_records(created_at);
+        CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales_records(customer_id);
+        CREATE TABLE IF NOT EXISTS sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT NOT NULL, product_id TEXT, quantity REAL NOT NULL, price REAL NOT NULL, subtotal REAL NOT NULL, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+        CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, total_debt REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+        CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, amount REAL NOT NULL, shift_id TEXT, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
+        CREATE TABLE IF NOT EXISTS shifts (id TEXT PRIMARY KEY, opened_at TEXT NOT NULL, closed_at TEXT, payload TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS debt_payments (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT NOT NULL, amount REAL NOT NULL, payload TEXT NOT NULL);
+      `)
+      migrateNormalizedTables()
+      return
+    } catch (err) {
+      console.warn('SQLite init failed, using JSON store:', err)
+      database = null
+    }
+  }
+  loadJsonStore()
 }
 
 function asNumber(value) { return Number.isFinite(Number(value)) ? Number(value) : 0 }
@@ -138,19 +176,25 @@ function pruneBackups() {
 }
 
 function createBackup() {
-  if (!database || database.open === false) return null
   const backupDirectory = getBackupDirectory()
   fs.mkdirSync(backupDirectory, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const destination = path.join(backupDirectory, `bayaa-pos-${stamp}.sqlite`)
-  database.pragma('wal_checkpoint(PASSIVE)')
-  database.backup(destination)
-  pruneBackups()
+  if (database && database.open !== false) {
+    const destination = path.join(backupDirectory, `bayaa-pos-${stamp}.sqlite`)
+    database.pragma('wal_checkpoint(PASSIVE)')
+    database.backup(destination)
+    pruneBackups()
+    return destination
+  }
+  // JSON fallback backup
+  const destination = path.join(backupDirectory, `bayaa-pos-${stamp}.json`)
+  fs.writeFileSync(destination, JSON.stringify(jsonStore, null, 2), 'utf-8')
   return destination
 }
 
 function validateSqliteFile(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return false
+  if (!Database) return filePath.endsWith('.json')
   try {
     const candidate = new Database(filePath, { readonly: true, fileMustExist: true })
     const row = candidate.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_data'").get()
@@ -165,12 +209,28 @@ function validateSqliteFile(filePath) {
 
 async function restoreDatabase() {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'استعادة قاعدة بيانات SQLite',
+    title: 'استعادة قاعدة البيانات',
     properties: ['openFile'],
-    filters: [{ name: 'SQLite database', extensions: ['sqlite', 'db'] }],
+    filters: [
+      { name: 'Backup files', extensions: ['sqlite', 'db', 'json'] },
+    ],
   })
   if (result.canceled || !result.filePaths[0]) return null
   const source = result.filePaths[0]
+
+  if (source.endsWith('.json')) {
+    try {
+      const content = JSON.parse(fs.readFileSync(source, 'utf-8'))
+      jsonStore = content
+      saveJsonStore()
+      app.relaunch()
+      app.exit(0)
+      return true
+    } catch (e) {
+      throw new Error('ملف النسخة الاحتياطية JSON غير صالح')
+    }
+  }
+
   if (!validateSqliteFile(source)) throw new Error('ملف قاعدة البيانات غير صالح')
   const databasePath = getDatabasePath()
   createBackup()
@@ -186,45 +246,74 @@ async function restoreDatabase() {
 
 function registerDatabaseHandlers() {
   ipcMain.on('db:get-sync', (event, key) => {
-    const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
-    event.returnValue = row ? JSON.parse(row.value) : null
+    if (database) {
+      const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
+      event.returnValue = row ? JSON.parse(row.value) : null
+      return
+    }
+    event.returnValue = jsonStore[key] ?? null
   })
 
   ipcMain.on('db:set-sync', (event, key, value) => {
-    const now = new Date().toISOString()
-    database.prepare(`
-      INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `).run(key, JSON.stringify(value), now)
-    syncNormalizedData(key, value)
+    if (database) {
+      const now = new Date().toISOString()
+      database.prepare(`
+        INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(key, JSON.stringify(value), now)
+      syncNormalizedData(key, value)
+      event.returnValue = true
+      return
+    }
+    jsonStore[key] = value
+    saveJsonStore()
     event.returnValue = true
   })
 
   ipcMain.on('db:delete-sync', (event, key) => {
-    database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
-    syncNormalizedData(key, [])
+    if (database) {
+      database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
+      syncNormalizedData(key, [])
+      event.returnValue = true
+      return
+    }
+    delete jsonStore[key]
+    saveJsonStore()
     event.returnValue = true
   })
 
   ipcMain.handle('db:get', (_event, key) => {
-    const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
-    return row ? JSON.parse(row.value) : null
+    if (database) {
+      const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
+      return row ? JSON.parse(row.value) : null
+    }
+    return jsonStore[key] ?? null
   })
 
   ipcMain.handle('db:set', (_event, key, value) => {
-    const now = new Date().toISOString()
-    const serialized = JSON.stringify(value)
-    database.prepare(`
-      INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `).run(key, serialized, now)
-    syncNormalizedData(key, value)
+    if (database) {
+      const now = new Date().toISOString()
+      const serialized = JSON.stringify(value)
+      database.prepare(`
+        INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(key, serialized, now)
+      syncNormalizedData(key, value)
+      return true
+    }
+    jsonStore[key] = value
+    saveJsonStore()
     return true
   })
 
   ipcMain.handle('db:delete', (_event, key) => {
-    database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
-    syncNormalizedData(key, [])
+    if (database) {
+      database.prepare('DELETE FROM app_data WHERE key = ?').run(key)
+      syncNormalizedData(key, [])
+      return true
+    }
+    delete jsonStore[key]
+    saveJsonStore()
     return true
   })
 
@@ -236,26 +325,32 @@ function registerDatabaseHandlers() {
       mainWindow.webContents.print({ silent: false, printBackground: true, margins: { marginType: 'none' } }, (success) => resolve(success))
     })
   })
-  ipcMain.handle('app:get-paths', () => ({ database: getDatabasePath(), backups: getBackupDirectory() }))
+  ipcMain.handle('app:get-paths', () => ({ database: database ? getDatabasePath() : jsonStorePath(), backups: getBackupDirectory() }))
   ipcMain.handle('app:open-backups', () => shell.openPath(getBackupDirectory()))
   ipcMain.handle('app:export-backup', async () => {
+    const isSqlite = Boolean(database)
+    const ext = isSqlite ? 'sqlite' : 'json'
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'حفظ نسخة احتياطية',
-      defaultPath: path.join(app.getPath('documents'), `bayaa-pos-backup-${new Date().toISOString().slice(0, 10)}.sqlite`),
-      filters: [{ name: 'SQLite database', extensions: ['sqlite'] }],
+      defaultPath: path.join(app.getPath('documents'), `osama-pos-backup-${new Date().toISOString().slice(0, 10)}.${ext}`),
+      filters: [{ name: isSqlite ? 'SQLite database' : 'JSON Backup', extensions: [ext] }],
     })
     if (result.canceled || !result.filePath) return null
-    await database.backup(result.filePath)
+    if (isSqlite) {
+      await database.backup(result.filePath)
+    } else {
+      fs.writeFileSync(result.filePath, JSON.stringify(jsonStore, null, 2), 'utf-8')
+    }
     return result.filePath
   })
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
+    width: 1280,
+    height: 800,
+    minWidth: 800,
+    minHeight: 500,
     show: false,
     backgroundColor: '#f1f5f9',
     autoHideMenuBar: true,
@@ -267,7 +362,10 @@ function createWindow() {
     },
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize()
+    mainWindow.show()
+  })
   mainWindow.on('unresponsive', () => console.error('Electron renderer became unresponsive'))
 
   if (process.env.ELECTRON_START_URL) {

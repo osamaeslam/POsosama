@@ -334,11 +334,11 @@ export const Header: React.FC = () => {
       {/* Desktop App Installation Guidance Modal */}
       {showDesktopModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Monitor className="w-5 h-5 text-blue-600" />
-                <span>تشغيل وتثبيت بياع POS كبرنامج ديسكتوب أوفلاين</span>
+                <span>تشغيل وتثبيت Osama Pos كبرنامج ديسكتوب أوفلاين</span>
               </h3>
               <button
                 onClick={() => setShowDesktopModal(false)}
@@ -348,43 +348,61 @@ export const Header: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs text-slate-600 leading-relaxed">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 font-medium">
-                ✅ <strong>نعم، البرنامج مهيأ ليعمل أوفلاين كبرنامج ديسكتوب مت��امل</strong> ويحفظ كافة العمليات محلياً على جهازك دون إنترنت.
+            <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 font-medium">
+                ✅ <strong>نعم له حل كامل!</strong> يمكنك تشغيل البرنامج ديسكتوب أوفلاين بطريقتين مضمونتين 100%:
               </div>
 
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-800">طريقة التثبيت المباشر على Windows / Mac:</h4>
-                <ol className="list-decimal list-inside space-y-1.5 pr-1 text-slate-700">
+              {/* Method 1: PWA Desktop Install */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+                <h4 className="font-bold text-blue-950 flex items-center gap-1.5 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
+                  <span>الطريقة الأسرع (تثبيت بنقرة واحدة - بدون أي برامج تجميع):</span>
+                </h4>
+                <p className="text-slate-700">
+                  من متصفح <strong>Google Chrome</strong> أو <strong>Microsoft Edge</strong>:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-700 pr-1">
                   <li>
-                    من متصفح <strong>Google Chrome</strong> أو <strong>Microsoft Edge</strong>:
+                    ستجد في شريط العنوان بالأعلى أيقونة شاشة كمبيوتر صغيرة مكتوب عليها <strong>تثبيت التطبيق / Install App</strong>.
                   </li>
                   <li>
-                    انظر إلى شريط العنوان في الأعلى، ستجد أيقونة تثبيت صغيرة <span className="px-1.5 py-0.5 bg-slate-100 font-mono rounded text-[10px]">Install / تثبيت التطبيق</span>.
+                    أو اضغط على زر القائمة (⋮) ثم اختر <strong>"تثبيت Osama Pos"</strong>.
                   </li>
                   <li>
-                    أو اضغط على قائمة المتصفح (الثلاث نقاط) واختر: <strong>"تثبيت Osama Pos على سطح المكتب"</strong>.
+                    سيتم إنشاء أيقونة على سطح المكتب للبرنامج ويفتح في نافذة مستقلة كبرنامج أصلي بدون إنترنت!
                   </li>
-                  <li>
-                    ستظهر لك أيقونة البرنامج فوراً على شاشة سطح المكتب وقائمة Start، وسيفتح البرنامج في نافذة مستقلة تماماً مثل أي برنامج ويندوز أصلي.
-                  </li>
-                </ol>
+                </ul>
               </div>
 
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-1">
-                <div className="font-bold">⚡ الجاهزية والقدرة الاستيعابية اليومية:</div>
-                <div>• يستحمل بسهولة <strong>من 500 إلى 1,000 فاتورة يومياً</strong> دون أي تهنيج أو بطء.</div>
-                <div>• يدعم البيع السريع بحفظ الفواتير <strong>بدون طباعة</strong>، أو الطباعة الفورية عند الطلب.</div>
-                <div>• يمكنك أخذ نسخة احتياطية دورية بنقرة واحدة من شاشة الإعدادات.</div>
+              {/* Method 2: Local Windows Launcher / .exe */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>تشغيل كبرنامج ويندوز أو تحويله إلى ملف تنفيذي (.exe):</span>
+                </h4>
+                <div className="space-y-1.5 text-slate-700">
+                  <p>
+                    • تم إنشاء ملف تشغيل سريع في المجلد الرئيسي اسمه: <code className="bg-slate-200 text-slate-900 px-1 py-0.5 rounded font-mono text-[11px]">تشغيل-الديسكتوب.bat</code> — اضغط عليه مرتين وسيعمل فوراً كنافذة مستقلة.
+                  </p>
+                  <p>
+                    • تم حل مشكلة التحويل إلى <code className="bg-slate-200 text-slate-900 px-1 py-0.5 rounded font-mono text-[11px]">.exe</code> عبر جعل التخزين مرناً لا يعتمد على مكتبات C++ المعقدة. يمكنك تشغيل ملف: <code className="bg-slate-200 text-slate-900 px-1 py-0.5 rounded font-mono text-[11px]">بناء-ملف-exe.bat</code> لتوليد البرنامج التنفيذي مباشرة.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1">
+                <div className="font-bold">💡 ملاحظة هامة لحفظ البيانات:</div>
+                <div>البيانات تُحفظ بالكامل محلياً على جهازك، ويمكنك في أي وقت تصدير نسخة احتياطية بنقرة واحدة من شاشة الإعدادات.</div>
               </div>
             </div>
 
             <div className="flex justify-end pt-4 border-t border-slate-100 mt-4">
               <button
                 onClick={() => setShowDesktopModal(false)}
-                className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer"
+                className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer shadow-sm"
               >
-                فهمت، شكراً لك
+                إغلاق
               </button>
             </div>
           </div>

@@ -107,23 +107,68 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const appStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = window.bayaaDesktop?.database
-  ? {
-      getItem: (key) => {
-        const databaseValue = window.bayaaDesktop?.database.getSync<string>(key);
-        if (databaseValue !== null && databaseValue !== undefined) return databaseValue;
-        return window.localStorage.getItem(key);
-      },
-      setItem: (key, value) => {
-        window.bayaaDesktop?.database.setSync(key, value);
-        window.localStorage.setItem(key, value);
-      },
-      removeItem: (key) => {
-        window.bayaaDesktop?.database.deleteSync(key);
-        window.localStorage.removeItem(key);
-      },
+const inMemoryStore: Record<string, string> = {};
+
+// Background IndexedDB persistence for browser mode (supports hundreds of MBs of offline data)
+const IDB_NAME = 'osama_pos_offline_db';
+const IDB_STORE = 'app_data';
+
+const saveToIndexedDB = (key: string, value: string) => {
+  if (typeof window === 'undefined' || !window.indexedDB) return;
+  try {
+    const request = window.indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: 'key' });
+      }
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ key, value, updatedAt: Date.now() });
+    };
+  } catch (err) {
+    console.warn('IndexedDB sync error:', err);
+  }
+};
+
+const appStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = {
+  getItem: (key) => {
+    if (window.bayaaDesktop?.database) {
+      const databaseValue = window.bayaaDesktop.database.getSync<string>(key);
+      if (databaseValue !== null && databaseValue !== undefined) {
+        return typeof databaseValue === 'string' ? databaseValue : JSON.stringify(databaseValue);
+      }
     }
-  : window.localStorage;
+    const localVal = window.localStorage.getItem(key);
+    if (localVal !== null) return localVal;
+    return inMemoryStore[key] ?? null;
+  },
+  setItem: (key, value) => {
+    inMemoryStore[key] = value;
+    if (window.bayaaDesktop?.database) {
+      window.bayaaDesktop.database.setSync(key, value);
+    }
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn('LocalStorage quota limit reached, persisted via IndexedDB & memory:', e);
+    }
+    saveToIndexedDB(key, value);
+  },
+  removeItem: (key) => {
+    delete inMemoryStore[key];
+    if (window.bayaaDesktop?.database) {
+      window.bayaaDesktop.database.deleteSync(key);
+    }
+    try {
+      window.localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('LocalStorage remove error:', e);
+    }
+  },
+};
 
 const STORAGE_KEYS = {
   LANG: 'bayaa_pos_lang',

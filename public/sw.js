@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bayaa-pos-v1';
+const CACHE_NAME = 'osama-pos-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -31,15 +31,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
+      if (cached) {
+        // Stale-while-revalidate in background if online
+        fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, networkResponse.clone());
+              });
+            }
+          })
+          .catch(() => {
+            // Offline - cached response is already returned
+          });
+        return cached;
+      }
+
       return fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          if (!response || (response.status !== 200 && response.type !== 'opaque')) {
             return response;
           }
           const responseToCache = response.clone();
@@ -51,8 +65,9 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // If offline and requesting navigation, return index.html
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('/index.html') || caches.match('/');
           }
+          return null;
         });
     })
   );
