@@ -211,9 +211,9 @@ export const POSScreen: React.FC = () => {
   const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
   const grandTotal = Math.max(0, subtotal + taxAmount - discountAmount);
 
-  const parsedCashReceived = parseFloat(cashReceived) || grandTotal;
+  const parsedCashReceived = Number(cashReceived);
   const changeDue =
-    paymentMethod === 'cash' && parsedCashReceived > grandTotal
+    paymentMethod === 'cash' && Number.isFinite(parsedCashReceived) && parsedCashReceived > grandTotal
       ? parsedCashReceived - grandTotal
       : 0;
 
@@ -238,6 +238,10 @@ export const POSScreen: React.FC = () => {
       } else {
         if (!creditCustomerName.trim()) {
           setCheckoutError('يرجى تحديد أو كتابة اسم العميل لتسجيل الفاتورة الآجلة');
+          return;
+        }
+        if (!creditCustomerPhone.trim()) {
+          setCheckoutError('يرجى كتابة رقم هاتف العميل لتسجيل الفاتورة الآجلة');
           return;
         }
         targetCustomerName = creditCustomerName.trim();
@@ -769,7 +773,7 @@ export const POSScreen: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-amber-900 mb-0.5">رقم الهاتف</label>
+                    <label className="block text-[11px] font-bold text-amber-900 mb-0.5">رقم الهاتف *</label>
                     <input
                       type="tel"
                       value={creditCustomerPhone}

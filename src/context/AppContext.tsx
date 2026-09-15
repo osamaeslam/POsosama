@@ -28,12 +28,9 @@ import {
   initialShifts,
   initialStoreSettings,
   initialUsers,
-  initialCustomers,
-  initialDebtPayments,
-  initialSuppliers,
-  initialSupplierInvoices,
-  initialSupplierPayments,
-} from '../services/mockData';
+    initialCustomers,
+    initialDebtPayments,
+  } from '../services/mockData';
 import { translations } from '../locales/translations';
 
 interface CheckoutExtraOptions {
@@ -275,7 +272,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = appStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const savedSettings = JSON.parse(saved) as StoreSettings;
+        return {
+          ...savedSettings,
+          taxNumber: '',
+          taxRate: 0,
+          enableTax: false,
+          currency: 'EGP',
+        };
       } catch (e) {
         console.error(e);
       }
@@ -285,7 +289,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings((prev) => {
-      const updated = { ...prev, ...newSettings };
+      const updated = {
+        ...prev,
+        ...newSettings,
+        taxNumber: '',
+        taxRate: 0,
+        enableTax: false,
+        currency: 'EGP',
+      };
       appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
       return updated;
     });
@@ -631,7 +642,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSuppliers;
+    return [];
   });
 
   const saveSuppliers = (newSuppliers: Supplier[]) => {
@@ -682,7 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSupplierInvoices;
+    return [];
   });
 
   const saveSupplierInvoices = (newInvoices: SupplierInvoice[]) => {
@@ -700,7 +711,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSupplierPayments;
+    return [];
   });
 
   const saveSupplierPayments = (newPayments: SupplierPayment[]) => {
@@ -987,15 +998,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error('كمية الصنف غير صحيحة');
       }
       if (Number.isFinite(stock) && quantity > stock) {
-        throw new Error(`الكمية المطلوبة من ${item.product.name} أكبر من المخزون المتاح`);
+        throw new Error(`الكمية المطلوبة من ${item.product.name} أك��ر من المخزون المتاح`);
       }
     }
 
-    const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
-    const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
-    const total = Math.max(0, subtotal + taxAmount - (discount || 0));
+  if (!['cash', 'credit', 'wallet'].includes(paymentMethod)) {
+    throw new Error('طريقة الدفع غير مدعومة. استخدم نقدي أو آجل أو محفظة إلكترونية');
+  }
 
-    const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
+  const subtotal = items.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+  const safeDiscount = Number(discount || 0);
+  if (!Number.isFinite(safeDiscount) || safeDiscount < 0 || safeDiscount > subtotal) {
+    throw new Error('قيمة الخصم غير صحيحة');
+  }
+  const taxAmount = settings.enableTax ? (subtotal * settings.taxRate) / 100 : 0;
+  const total = Math.max(0, subtotal + taxAmount - safeDiscount);
+
+  if (paymentMethod === 'cash') {
+    const received = Number(cashReceived);
+    if (!Number.isFinite(received) || received < total) {
+      throw new Error('المبلغ المستلم نقداً أقل من إجمالي الفاتورة');
+    }
+  }
+
+  if (paymentMethod === 'wallet' && !extra?.walletProvider?.trim()) {
+    throw new Error('يرجى تحديد المحفظة الإلكترونية');
+  }
+
+  if (paymentMethod === 'credit') {
+    if (!extra?.customerName?.trim()) {
+      throw new Error('لا يمكن تسجيل فاتورة آجلة بدون اسم العميل');
+    }
+    if (!extra?.customerPhone?.trim()) {
+      throw new Error('لا يمكن تسجيل فاتورة آجلة بدون رقم هاتف العميل');
+    }
+  }
+
+  const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `${settings.invoicePrefix}-${nextInvNum}`;
     const saleId = `sale_${Date.now()}`;
     const shiftId = currentShift.id;
@@ -1025,11 +1064,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       changeDue = cashReceived && cashReceived > total ? cashReceived - total : 0;
     } else if (paymentMethod === 'wallet') {
       cashPaidIntoDrawer = 0;
-    } else if (paymentMethod === 'credit') {
-      creditPaidAmount = Math.max(0, Number(extra?.creditPaidAmount) || 0);
-      creditRemainingDebt = Math.max(0, total - creditPaidAmount);
-      cashPaidIntoDrawer = creditPaidAmount; // cash received upfront
-    }
+  } else if (paymentMethod === 'credit') {
+  const requestedAdvance = Number(extra?.creditPaidAmount || 0);
+  if (!Number.isFinite(requestedAdvance) || requestedAdvance < 0 || requestedAdvance > total) {
+    throw new Error('المبلغ المدفوع مقدماً غير صحيح');
+  }
+  creditPaidAmount = requestedAdvance;
+  creditRemainingDebt = total - creditPaidAmount;
+  cashPaidIntoDrawer = creditPaidAmount; // الدفعة المقدمة نقدية وتدخل درج الكاشير
+  }
 
     const newSale: Sale = {
       id: saleId,
