@@ -348,7 +348,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteCategory = (id: string) => {
     if (products.some((product) => product.categoryId === id)) {
-      throw new Error('لا يمكن حذف فئة مرتبطة بمنتجات. انقل المنتجات أولاً.');
+      throw new Error('لا يمكن حذف فئة مرتبطة بمنتجا��. انقل المنتجات أولاً.');
     }
     saveCategories(categories.filter((category) => category.id !== id));
   };
@@ -662,12 +662,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplier = (id: string) => {
     const supplier = suppliers.find((s) => s.id === id);
     if (!supplier) return;
-    if ((supplier.totalPayable || 0) > 0) {
-      throw new Error('لا يمكن حذف مورد له مستحقات متبقية');
-    }
     const hasInvoices = supplierInvoices.some((inv) => inv.supplierId === id);
+    if ((supplier.totalPayable || 0) > 0 && hasInvoices) {
+      throw new Error('لا يمكن حذف المورد لأنه مرتبط بفواتير شراء ولديه مستحقات متبقية');
+    }
+    if ((supplier.totalPayable || 0) > 0) {
+      throw new Error('لا يمكن حذف المورد قبل سداد المستحقات المتبقية');
+    }
     if (hasInvoices) {
-      throw new Error('لا يمكن حذف مورد مسجل له فواتير شراء سابقة');
+      throw new Error('لا يمكن حذف المورد لأنه مرتبط بفواتير شراء سابقة');
     }
     saveSuppliers(suppliers.filter((s) => s.id !== id));
   };
@@ -987,7 +990,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error('كمية الصنف غير صحيحة');
       }
       if (Number.isFinite(stock) && quantity > stock) {
-        throw new Error(`الكمية المطلوبة من ${item.product.name} أكبر من المخزون المتاح`);
+        throw new Error(`الكمية المطلوبة من ${item.product.name} أك��ر من المخزون المتاح`);
       }
     }
 

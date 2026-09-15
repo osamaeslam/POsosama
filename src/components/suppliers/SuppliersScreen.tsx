@@ -106,7 +106,11 @@ export const SuppliersScreen: React.FC = () => {
   }, [supplierPayments, searchQuery]);
 
   const handleDeleteSupplier = (id: string, name: string) => {
-    if (window.confirm(`هل أنت متأكد من حذف المورد "${name}"؟`)) {
+    if (
+      window.confirm(
+        `هل أنت متأكد من حذف المورد "${name}"؟\n\nيمكن حذف المورد التجريبي أو الحقيقي فقط إذا لم تكن له فواتير أو مستحقات مرتبطة.`
+      )
+    ) {
       try {
         deleteSupplier(id);
       } catch (err: any) {
@@ -514,7 +518,7 @@ export const SuppliersScreen: React.FC = () => {
               </div>
               <h3 className="font-bold text-slate-800 text-base">لا يوجد موردين مطابقين</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                قم بإضافة بيانات الشركات والموزعين لتتبع كشوف الحسابات والمديونيات.
+                قم بإضافة بيانات الشركات والموزعين لتتبع كشوف الحسابات والمديونيات. البيانات التجريبية قابلة للتعديل أو الحذف إذا لم ترتبط بفواتير أو مستحقات.
               </p>
               <button
                 type="button"
