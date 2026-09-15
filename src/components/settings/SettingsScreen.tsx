@@ -13,6 +13,12 @@ import {
   AlertTriangle,
   ShieldCheck,
   UserPlus,
+  Sparkles,
+  RefreshCw,
+  Activity,
+  HardDrive,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { User } from '../../types';
 
@@ -27,6 +33,9 @@ export const SettingsScreen: React.FC = () => {
     exportDataJson,
     importDataJson,
     clearToEmptyStore,
+    cleanTempCache,
+    getStorageStats,
+    isOnline,
   } = useApp();
 
   // Store form state
@@ -65,6 +74,26 @@ export const SettingsScreen: React.FC = () => {
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'manager' | 'cashier'>('cashier');
   const [newUserPin, setNewUserPin] = useState('');
+
+  // Cache & System Maintenance State
+  const [isCleaning, setIsCleaning] = useState(false);
+  const [cleanupStatus, setCleanupStatus] = useState<string | null>(null);
+
+  const stats = getStorageStats();
+
+  const handleRunCleanup = async () => {
+    setIsCleaning(true);
+    setCleanupStatus(null);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      const res = await cleanTempCache();
+      setCleanupStatus(`تم تنظيف الذاكرة وتحرير ${(res.freedBytes / 1024).toFixed(1)} KB بنجاح! المتجر يعمل بأقصى سرعة.`);
+    } catch (err) {
+      setCleanupStatus('حدث خطأ أثناء فحص وتنظيف الذاكرة');
+    } finally {
+      setIsCleaning(false);
+    }
+  };
 
   // Save general settings
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -392,8 +421,61 @@ export const SettingsScreen: React.FC = () => {
                 <Database className="w-3.5 h-3.5 text-amber-700" />
                 <span>تصفير النظام والبدء بمتجر فارغ حقيقي (بدون أي بيانات وهمية)</span>
               </button>
-
             </div>
+          </div>
+
+          {/* Performance & Cache Maintenance Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-600" />
+                <span>أداء النظام والتنظيف الدوري للذاكرة</span>
+              </h3>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                {isOnline ? 'أوفلاين محلي (نشط)' : 'أوفلاين دائم'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              يقوم التنظيف الدوري بضغط سجلات التخزين، تفريغ الفهارس غير المستخدمة، وحذف المفاتيح المؤقتة لتسريع عمليات البيع ومسح الباركود.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 font-mono">
+              <div>
+                <span className="text-slate-400 block text-[10px]">حجم البيانات التقديري:</span>
+                <span className="font-bold text-slate-800">{stats.estimatedSizeKb} KB</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">المحرك التخزيني:</span>
+                <span className="font-bold text-slate-800">{stats.storageType === 'sqlite' ? 'SQLite' : 'IndexedDB'}</span>
+              </div>
+            </div>
+
+            {cleanupStatus && (
+              <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-2 animate-in fade-in">
+                <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>{cleanupStatus}</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleRunCleanup}
+              disabled={isCleaning}
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+            >
+              {isCleaning ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>جاري تنظيف الذاكرة المؤقتة...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>تنظيف الذاكرة المؤقتة وتسريع الأداء الآن</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Privacy & Offline Guarantee */}

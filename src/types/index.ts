@@ -185,14 +185,93 @@ export interface NotificationAlert {
   productId?: string;
 }
 
+// Supplier & Purchases Management
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  companyName?: string;
+  address?: string;
+  totalPayable: number; // مستحقات المورد (مديونية المحل للمورد)
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierInvoiceItem {
+  id: string;
+  productId: string;
+  productBarcode: string;
+  productName: string;
+  quantity: number;
+  unitCost: number; // سعر الشراء للقطعة
+  sellingPrice?: number; // سعر البيع الجديد المقترح (اختياري)
+  subtotal: number;
+}
+
+export interface SupplierInvoice {
+  id: string;
+  invoiceNumber: string; // كود الفاتورة في النظام e.g. SUP-1001
+  supplierInvoiceRef?: string; // رقم الفاتورة الورقية الخاصة بالمورد
+  supplierId: string;
+  supplierName: string;
+  supplierPhone?: string;
+  totalAmount: number; // إجمالي قيمة البضاعة المشتراة
+  paidAmount: number; // المدفوع كاش أو بنك
+  remainingDebt: number; // المتبقي آجل على المحل لصالح المورد
+  paymentStatus: 'paid' | 'partial' | 'unpaid';
+  paymentMethod: 'cash' | 'wallet' | 'bank' | 'credit';
+  paidFromCashDrawer: boolean; // هل تم الدفع من درج الكاشير في الوردية الحالية
+  shiftId?: string;
+  userId: string;
+  userName: string;
+  notes?: string;
+  items: SupplierInvoiceItem[];
+  createdAt: string;
+}
+
+export interface SupplierPayment {
+  id: string;
+  receiptNumber: string; // سند صرف نقدية لمورد e.g. VCH-SUP-101
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  paymentMethod: 'cash' | 'wallet' | 'bank';
+  paidFromCashDrawer: boolean;
+  shiftId?: string;
+  notes?: string;
+  createdAt: string;
+  userName: string;
+}
+
 export type ActiveTab =
   | 'dashboard'
   | 'pos'
   | 'debts'
   | 'invoices'
+  | 'suppliers'
   | 'products'
   | 'stock-alerts'
   | 'expenses'
   | 'sessions'
   | 'reports'
   | 'settings';
+
+export interface CacheCleanupResult {
+  freedBytes: number;
+  itemsRemoved: number;
+  timestamp: string;
+  message: string;
+}
+
+export interface StorageStats {
+  storageType: 'sqlite' | 'indexeddb' | 'localstorage';
+  totalProducts: number;
+  totalSales: number;
+  totalCustomers: number;
+  totalSuppliers?: number;
+  totalSupplierInvoices?: number;
+  estimatedSizeKb: number;
+  isOnline: boolean;
+  lastCleanedAt?: string;
+}

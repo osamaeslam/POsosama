@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "desktop:dev": "concurrently -k \"vite --port=3000 --host=127.0.0.1\" \"wait-on http://127.0.0.1:3000 && ELECTRON_START_URL=http://127.0.0.1:3000 electron .\"",
-    "desktop:build": "vite build && electron-builder",
+    "desktop:build": "vite build && npx electron-builder --win",
+    "dist": "npx electron-builder --win",
     "clean": "rm -rf dist server.js release",
     "lint": "tsc --noEmit"
   },
@@ -29,13 +30,17 @@
     "asar": true,
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "portable"
       ],
       "icon": "public/assets/Icon_app.png"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Osama Pos"
     }
   },
   "dependencies": {

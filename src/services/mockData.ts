@@ -1,4 +1,4 @@
-import { Category, Product, StoreSettings, User, Shift, Sale, Expense, Customer, DebtPayment } from '../types';
+import { Category, Product, StoreSettings, User, Shift, Sale, Expense, Customer, DebtPayment, Supplier, SupplierInvoice, SupplierPayment } from '../types';
 
 export const initialCustomers: Customer[] = [
   {
@@ -350,3 +350,117 @@ export const initialSales: Sale[] = [
     ],
   },
 ];
+
+export const initialSuppliers: Supplier[] = [
+  {
+    id: 'sup_1',
+    name: 'شركة النيل للتوزيع والإلكترونيات',
+    phone: '01023456789',
+    companyName: 'النيل للتجارة والتوزيع',
+    address: 'شارع البستان، باب اللوق، القاهرة',
+    totalPayable: 14500,
+    notes: 'مورد رئيسي لهواتف سامسونج وإكسسوارات شاومي - تسهيلات 30 يوم',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'sup_2',
+    name: 'مؤسسة الشروق للتوكيلات التجارية',
+    phone: '01156789012',
+    companyName: 'الشروق جروب',
+    address: 'ميدان العتبة، الموسكي، القاهرة',
+    totalPayable: 6200,
+    notes: 'شواحن، كابلات، وشاشات حماية زجاجية بأسعار جملة الجملة',
+    createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'sup_3',
+    name: 'الشركة العربية للحلول الرقمية',
+    phone: '01245678901',
+    companyName: 'العربية ديجيتال',
+    address: 'المهندسين، شارع سوريا، الجيزة',
+    totalPayable: 0,
+    notes: 'حساب مسدد بالكامل - كاش عند التسليم',
+    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const initialSupplierInvoices: SupplierInvoice[] = [
+  {
+    id: 'sup_inv_1',
+    invoiceNumber: 'SUP-101',
+    supplierInvoiceRef: 'B-84920',
+    supplierId: 'sup_1',
+    supplierName: 'شركة النيل للتوزيع والإلكترونيات',
+    supplierPhone: '01023456789',
+    totalAmount: 24500,
+    paidAmount: 10000,
+    remainingDebt: 14500,
+    paymentStatus: 'partial',
+    paymentMethod: 'cash',
+    paidFromCashDrawer: false,
+    shiftId: 'shift_prev_1',
+    userId: 'admin',
+    userName: 'مدير النظام (Admin)',
+    notes: 'توريد شحنة شواحن وبطاريات جديدة',
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    items: [
+      {
+        id: 'sup_item_1',
+        productId: '444444',
+        productBarcode: '444444',
+        productName: 'Anker PowerBank 20,000mAh',
+        quantity: 15,
+        unitCost: 1100,
+        sellingPrice: 1350,
+        subtotal: 16500,
+      },
+      {
+        id: 'sup_item_2',
+        productId: '666666',
+        productBarcode: '666666',
+        productName: 'Samsung 25W Fast Charger (Type-C)',
+        quantity: 20,
+        unitCost: 400,
+        sellingPrice: 550,
+        subtotal: 8000,
+      },
+    ],
+  },
+  {
+    id: 'sup_inv_2',
+    invoiceNumber: 'SUP-102',
+    supplierInvoiceRef: 'SH-4421',
+    supplierId: 'sup_2',
+    supplierName: 'مؤسسة الشروق للتوكيلات التجارية',
+    supplierPhone: '01156789012',
+    totalAmount: 6200,
+    paidAmount: 0,
+    remainingDebt: 6200,
+    paymentStatus: 'unpaid',
+    paymentMethod: 'credit',
+    paidFromCashDrawer: false,
+    shiftId: 'shift_current',
+    userId: 'admin',
+    userName: 'مدير النظام (Admin)',
+    notes: 'إذن توريد آجل - السداد الأسبوع القادم',
+    createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+    items: [
+      {
+        id: 'sup_item_3',
+        productId: '555555',
+        productBarcode: '555555',
+        productName: 'iPhone 14 Silicone Case (Original)',
+        quantity: 20,
+        unitCost: 310,
+        sellingPrice: 450,
+        subtotal: 6200,
+      },
+    ],
+  },
+];
+
+export const initialSupplierPayments: SupplierPayment[] = [];
+

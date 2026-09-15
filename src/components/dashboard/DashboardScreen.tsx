@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   Printer,
   RotateCcw,
+  Truck,
 } from 'lucide-react';
 import { Sale } from '../../types';
 import { ReceiptModal } from '../invoices/ReceiptModal';
@@ -122,6 +123,13 @@ export const DashboardScreen: React.FC = () => {
           >
             <PlusCircle className="w-4 h-4" />
             <span>إضافة صنف</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('suppliers')}
+            className="px-4 py-2.5 bg-indigo-500/80 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer border border-indigo-300/30"
+          >
+            <Truck className="w-4 h-4" />
+            <span>فواتير الموردين</span>
           </button>
         </div>
       </div>

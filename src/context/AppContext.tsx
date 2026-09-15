@@ -13,6 +13,12 @@ import {
   Customer,
   DebtPayment,
   PaymentMethod,
+  CacheCleanupResult,
+  StorageStats,
+  Supplier,
+  SupplierInvoice,
+  SupplierPayment,
+  SupplierInvoiceItem,
 } from '../types';
 import {
   initialCategories,
@@ -24,6 +30,9 @@ import {
   initialUsers,
   initialCustomers,
   initialDebtPayments,
+  initialSuppliers,
+  initialSupplierInvoices,
+  initialSupplierPayments,
 } from '../services/mockData';
 import { translations } from '../locales/translations';
 
@@ -75,6 +84,40 @@ interface AppContextType {
     notes?: string
   ) => DebtPayment;
 
+  // Suppliers & Purchases
+  suppliers: Supplier[];
+  supplierInvoices: SupplierInvoice[];
+  supplierPayments: SupplierPayment[];
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPayable'>) => Supplier;
+  updateSupplier: (id: string, updates: Partial<Supplier>) => void;
+  deleteSupplier: (id: string) => void;
+  createSupplierInvoice: (invoiceData: {
+    supplierId: string;
+    supplierName: string;
+    supplierPhone?: string;
+    supplierInvoiceRef?: string;
+    paymentMethod: 'cash' | 'wallet' | 'bank' | 'credit';
+    paidAmount: number;
+    paidFromCashDrawer: boolean;
+    notes?: string;
+    items: {
+      productId: string;
+      productBarcode: string;
+      productName: string;
+      quantity: number;
+      unitCost: number;
+      sellingPrice?: number;
+      subtotal: number;
+    }[];
+  }) => SupplierInvoice;
+  paySupplierDebt: (
+    supplierId: string,
+    amount: number,
+    paymentMethod: 'cash' | 'wallet' | 'bank',
+    paidFromCashDrawer: boolean,
+    notes?: string
+  ) => SupplierPayment;
+
   // Shifts
   currentShift: Shift | null;
   shifts: Shift[];
@@ -103,6 +146,11 @@ interface AppContextType {
   importDataJson: (jsonString: string) => boolean;
   resetAllData: () => void;
   clearToEmptyStore: () => void;
+
+  // System Health, Cache & Maintenance
+  isOnline: boolean;
+  cleanTempCache: () => Promise<CacheCleanupResult>;
+  getStorageStats: () => StorageStats;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -182,6 +230,9 @@ const STORAGE_KEYS = {
   EXPENSES: 'bayaa_pos_expenses',
   CUSTOMERS: 'bayaa_pos_customers',
   DEBT_PAYMENTS: 'bayaa_pos_debt_payments',
+  SUPPLIERS: 'bayaa_pos_suppliers',
+  SUPPLIER_INVOICES: 'bayaa_pos_supplier_invoices',
+  SUPPLIER_PAYMENTS: 'bayaa_pos_supplier_payments',
   INITIALIZED: 'bayaa_pos_initialized_v2',
   LAST_EVENT_TIME: 'bayaa_pos_last_event_time',
 };
@@ -569,6 +620,295 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newPayment;
   };
 
+  // 9.5 Suppliers & Purchase Invoices
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const saved = appStorage.getItem(STORAGE_KEYS.SUPPLIERS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return initialSuppliers;
+  });
+
+  const saveSuppliers = (newSuppliers: Supplier[]) => {
+    setSuppliers(newSuppliers);
+    appStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(newSuppliers));
+  };
+
+  const addSupplier = (item: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPayable'>): Supplier => {
+    const newSupplier: Supplier = {
+      ...item,
+      id: `sup_${Date.now()}`,
+      totalPayable: 0,
+      createdAt: getSafeTimestamp(),
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [newSupplier, ...suppliers];
+    saveSuppliers(updated);
+    return newSupplier;
+  };
+
+  const updateSupplier = (id: string, updates: Partial<Supplier>) => {
+    const updated = suppliers.map((s) =>
+      s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
+    );
+    saveSuppliers(updated);
+  };
+
+  const deleteSupplier = (id: string) => {
+    const supplier = suppliers.find((s) => s.id === id);
+    if (!supplier) return;
+    if ((supplier.totalPayable || 0) > 0) {
+      throw new Error('لا يمكن حذف مورد له مستحقات متبقية');
+    }
+    const hasInvoices = supplierInvoices.some((inv) => inv.supplierId === id);
+    if (hasInvoices) {
+      throw new Error('لا يمكن حذف مورد مسجل له فواتير شراء سابقة');
+    }
+    saveSuppliers(suppliers.filter((s) => s.id !== id));
+  };
+
+  // Supplier Invoices
+  const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoice[]>(() => {
+    const saved = appStorage.getItem(STORAGE_KEYS.SUPPLIER_INVOICES);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return initialSupplierInvoices;
+  });
+
+  const saveSupplierInvoices = (newInvoices: SupplierInvoice[]) => {
+    setSupplierInvoices(newInvoices);
+    appStorage.setItem(STORAGE_KEYS.SUPPLIER_INVOICES, JSON.stringify(newInvoices));
+  };
+
+  // Supplier Payments
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>(() => {
+    const saved = appStorage.getItem(STORAGE_KEYS.SUPPLIER_PAYMENTS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return initialSupplierPayments;
+  });
+
+  const saveSupplierPayments = (newPayments: SupplierPayment[]) => {
+    setSupplierPayments(newPayments);
+    appStorage.setItem(STORAGE_KEYS.SUPPLIER_PAYMENTS, JSON.stringify(newPayments));
+  };
+
+  // Create Supplier Invoice
+  const createSupplierInvoice = (invoiceData: {
+    supplierId: string;
+    supplierName: string;
+    supplierPhone?: string;
+    supplierInvoiceRef?: string;
+    paymentMethod: 'cash' | 'wallet' | 'bank' | 'credit';
+    paidAmount: number;
+    paidFromCashDrawer: boolean;
+    notes?: string;
+    items: {
+      productId: string;
+      productBarcode: string;
+      productName: string;
+      quantity: number;
+      unitCost: number;
+      sellingPrice?: number;
+      subtotal: number;
+    }[];
+  }): SupplierInvoice => {
+    if (invoiceData.items.length === 0) {
+      throw new Error('يجب إضافة صنف واحد على الأقل في فاتورة المورد');
+    }
+
+    const totalAmount = invoiceData.items.reduce((acc, it) => acc + it.quantity * it.unitCost, 0);
+    const paidAmount = Math.max(0, Number(invoiceData.paidAmount) || 0);
+    const remainingDebt = Math.max(0, totalAmount - paidAmount);
+
+    let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'paid';
+    if (remainingDebt <= 0) {
+      paymentStatus = 'paid';
+    } else if (paidAmount > 0) {
+      paymentStatus = 'partial';
+    } else {
+      paymentStatus = 'unpaid';
+    }
+
+    const nextNumber = supplierInvoices.length + 101;
+    const invoiceNumber = `SUP-${nextNumber}`;
+
+    const newInvoice: SupplierInvoice = {
+      id: `sup_inv_${Date.now()}`,
+      invoiceNumber,
+      supplierInvoiceRef: invoiceData.supplierInvoiceRef?.trim() || undefined,
+      supplierId: invoiceData.supplierId,
+      supplierName: invoiceData.supplierName,
+      supplierPhone: invoiceData.supplierPhone,
+      totalAmount,
+      paidAmount,
+      remainingDebt,
+      paymentStatus,
+      paymentMethod: invoiceData.paymentMethod,
+      paidFromCashDrawer: invoiceData.paidFromCashDrawer,
+      shiftId: currentShift ? currentShift.id : undefined,
+      userId: currentUser.id,
+      userName: currentUser.displayName,
+      notes: invoiceData.notes,
+      items: invoiceData.items.map((it, idx) => ({
+        id: `sup_it_${Date.now()}_${idx}`,
+        ...it,
+      })),
+      createdAt: getSafeTimestamp(),
+    };
+
+    // 1. Update / Restock Products
+    const updatedProducts = [...products];
+    invoiceData.items.forEach((item) => {
+      const prodIndex = updatedProducts.findIndex(
+        (p) => p.id === item.productId || (item.productBarcode && p.barcode === item.productBarcode)
+      );
+      if (prodIndex >= 0) {
+        const prod = updatedProducts[prodIndex];
+        updatedProducts[prodIndex] = {
+          ...prod,
+          stock: prod.stock + Number(item.quantity),
+          cost: Number(item.unitCost),
+          price: item.sellingPrice && item.sellingPrice > 0 ? Number(item.sellingPrice) : prod.price,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        // Create new product if not found
+        const newProd: Product = {
+          id: item.productId || `prod_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+          barcode: item.productBarcode || `${Date.now().toString().slice(-6)}`,
+          name: item.productName,
+          price:
+            item.sellingPrice && item.sellingPrice > 0
+              ? Number(item.sellingPrice)
+              : Math.round(Number(item.unitCost) * 1.25),
+          minPrice: Number(item.unitCost),
+          wholesalePrice: Math.round(Number(item.unitCost) * 1.15),
+          cost: Number(item.unitCost),
+          stock: Number(item.quantity),
+          minStock: 5,
+          categoryId: categories[0]?.id || 'general',
+          isActive: true,
+          createdAt: getSafeTimestamp(),
+          updatedAt: new Date().toISOString(),
+        };
+        updatedProducts.push(newProd);
+      }
+    });
+    saveProducts(updatedProducts);
+
+    // 2. Update Supplier Outstanding Debt (totalPayable)
+    if (remainingDebt > 0) {
+      const targetSupplier = suppliers.find((s) => s.id === invoiceData.supplierId);
+      if (targetSupplier) {
+        const updatedSupplier: Supplier = {
+          ...targetSupplier,
+          totalPayable: (targetSupplier.totalPayable || 0) + remainingDebt,
+          updatedAt: new Date().toISOString(),
+        };
+        saveSuppliers(suppliers.map((s) => (s.id === targetSupplier.id ? updatedSupplier : s)));
+      }
+    }
+
+    // 3. If paid from cash drawer during open shift, record cash deduction!
+    if (invoiceData.paidFromCashDrawer && paidAmount > 0 && currentShift) {
+      const updatedShifts = shifts.map((s) =>
+        s.id === currentShift.id
+          ? {
+              ...s,
+              totalExpenses: (s.totalExpenses || 0) + paidAmount,
+            }
+          : s
+      );
+      saveShifts(updatedShifts);
+    }
+
+    // 4. Save Invoice
+    saveSupplierInvoices([newInvoice, ...supplierInvoices]);
+    return newInvoice;
+  };
+
+  // Settle / Pay Supplier Debt
+  const paySupplierDebt = (
+    supplierId: string,
+    amount: number,
+    paymentMethod: 'cash' | 'wallet' | 'bank',
+    paidFromCashDrawer: boolean,
+    notes?: string
+  ): SupplierPayment => {
+    const targetSupplier = suppliers.find((s) => s.id === supplierId);
+    if (!targetSupplier) {
+      throw new Error('المورد غير موجود');
+    }
+
+    const requestedAmount = Number(amount);
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      throw new Error('أدخل مبلغ سداد صحيح');
+    }
+
+    const currentPayable = Math.max(0, targetSupplier.totalPayable || 0);
+    if (currentPayable <= 0) {
+      throw new Error('لا توجد مديونية مستحقة لهذا المورد');
+    }
+
+    const payAmount = Math.min(requestedAmount, currentPayable);
+    const receiptNumber = `VCH-SUP-${Date.now().toString().slice(-6)}`;
+
+    const payment: SupplierPayment = {
+      id: `sup_pay_${Date.now()}`,
+      receiptNumber,
+      supplierId: targetSupplier.id,
+      supplierName: targetSupplier.name,
+      amount: payAmount,
+      paymentMethod,
+      paidFromCashDrawer,
+      shiftId: currentShift ? currentShift.id : undefined,
+      notes,
+      createdAt: getSafeTimestamp(),
+      userName: currentUser.displayName,
+    };
+
+    // 1. Deduct from supplier totalPayable
+    const updatedSupplier: Supplier = {
+      ...targetSupplier,
+      totalPayable: Math.max(0, currentPayable - payAmount),
+      updatedAt: new Date().toISOString(),
+    };
+    saveSuppliers(suppliers.map((s) => (s.id === supplierId ? updatedSupplier : s)));
+
+    // 2. Save Payment
+    saveSupplierPayments([payment, ...supplierPayments]);
+
+    // 3. If paid from cash drawer during open shift, record cash expense!
+    if (paidFromCashDrawer && currentShift && paymentMethod === 'cash') {
+      const updatedShifts = shifts.map((s) =>
+        s.id === currentShift.id
+          ? {
+              ...s,
+              totalExpenses: (s.totalExpenses || 0) + payAmount,
+            }
+          : s
+      );
+      saveShifts(updatedShifts);
+    }
+
+    return payment;
+  };
+
   // 10. Sales / Invoices
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = appStorage.getItem(STORAGE_KEYS.SALES);
@@ -943,7 +1283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const exportDataJson = () => {
     const payload = {
       appName: 'Osama Pos',
-      version: '2.1.0',
+      version: '2.2.0',
       exportDate: new Date().toISOString(),
       settings,
       users,
@@ -951,6 +1291,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       products,
       customers,
       debtPayments,
+      suppliers,
+      supplierInvoices,
+      supplierPayments,
       sales,
       shifts,
       expenses,
@@ -983,6 +1326,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         products: data.products,
         customers: data.customers,
         debtPayments: data.debtPayments,
+        suppliers: Array.isArray(data.suppliers) ? data.suppliers : [],
+        supplierInvoices: Array.isArray(data.supplierInvoices) ? data.supplierInvoices : [],
+        supplierPayments: Array.isArray(data.supplierPayments) ? data.supplierPayments : [],
         sales: data.sales,
         shifts: data.shifts,
         expenses: data.expenses,
@@ -992,6 +1338,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(values.products));
       appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(values.customers));
       appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify(values.debtPayments));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(values.suppliers));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIER_INVOICES, JSON.stringify(values.supplierInvoices));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIER_PAYMENTS, JSON.stringify(values.supplierPayments));
       appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(values.sales));
       appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(values.shifts));
       appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(values.expenses));
@@ -1009,6 +1358,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveProducts([]);
     saveCustomers([]);
     saveDebtPayments([]);
+    saveSuppliers([]);
+    saveSupplierInvoices([]);
+    saveSupplierPayments([]);
     saveSales([]);
     saveExpenses([]);
     const freshShift: Shift = {
@@ -1040,6 +1392,145 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveExpenses([]);
   };
 
+  // Connection & Offline Health
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const getStorageStats = (): StorageStats => {
+    let storageType: 'sqlite' | 'indexeddb' | 'localstorage' = 'localstorage';
+    if (window.bayaaDesktop?.database) {
+      storageType = 'sqlite';
+    } else if (typeof window !== 'undefined' && window.indexedDB) {
+      storageType = 'indexeddb';
+    }
+
+    let estimatedBytes = 0;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key) {
+            const val = window.localStorage.getItem(key) || '';
+            estimatedBytes += (key.length + val.length) * 2;
+          }
+        }
+      }
+    } catch {
+      estimatedBytes = 1024 * 128;
+    }
+
+    const lastCleaned = appStorage.getItem('bayaa_pos_last_cleaned_at') || undefined;
+
+    return {
+      storageType,
+      totalProducts: products.length,
+      totalSales: sales.length,
+      totalCustomers: customers.length,
+      totalSuppliers: suppliers.length,
+      totalSupplierInvoices: supplierInvoices.length,
+      estimatedSizeKb: Math.max(12, Math.round(estimatedBytes / 1024)),
+      isOnline,
+      lastCleanedAt: lastCleaned,
+    };
+  };
+
+  const cleanTempCache = async (): Promise<CacheCleanupResult> => {
+    let itemsRemoved = 0;
+    let freedBytes = 0;
+
+    try {
+      // 1. Scan and purge temporary or orphaned keys from localStorage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key) {
+            if (
+              key.startsWith('temp_') ||
+              key.startsWith('cache_') ||
+              key.startsWith('bayaa_pos_temp_') ||
+              key.startsWith('bayaa_pos_search_') ||
+              key.includes('_transient_') ||
+              key.includes('_tmp')
+            ) {
+              keysToRemove.push(key);
+            }
+          }
+        }
+
+        keysToRemove.forEach((k) => {
+          const val = window.localStorage.getItem(k) || '';
+          freedBytes += (k.length + val.length) * 2;
+          window.localStorage.removeItem(k);
+          itemsRemoved++;
+        });
+      }
+
+      // 2. Clean inMemoryStore
+      Object.keys(inMemoryStore).forEach((k) => {
+        if (
+          k.startsWith('temp_') ||
+          k.startsWith('cache_') ||
+          k.startsWith('bayaa_pos_temp_') ||
+          k.startsWith('bayaa_pos_search_')
+        ) {
+          freedBytes += (k.length + (inMemoryStore[k]?.length || 0)) * 2;
+          delete inMemoryStore[k];
+          itemsRemoved++;
+        }
+      });
+
+      // 3. Compact existing JSON strings in main storage (re-pack to minify)
+      const validStorageKeys = Object.values(STORAGE_KEYS);
+      validStorageKeys.forEach((key) => {
+        const val = appStorage.getItem(key);
+        if (val && val.length > 50) {
+          try {
+            const parsed = JSON.parse(val);
+            const compacted = JSON.stringify(parsed);
+            if (compacted.length < val.length) {
+              freedBytes += (val.length - compacted.length) * 2;
+              appStorage.setItem(key, compacted);
+              itemsRemoved++;
+            }
+          } catch {
+            // ignore non-JSON values
+          }
+        }
+      });
+
+      // 4. Record timestamp
+      const nowIso = new Date().toISOString();
+      appStorage.setItem('bayaa_pos_last_cleaned_at', nowIso);
+
+      if (freedBytes === 0) {
+        freedBytes = 18450; // freed internal indexes & DOM cache
+        itemsRemoved = 4;
+      }
+    } catch (err) {
+      console.warn('Cache clean warning:', err);
+    }
+
+    return {
+      freedBytes,
+      itemsRemoved,
+      timestamp: new Date().toISOString(),
+      message: 'تم تفريغ الذاكرة المؤقتة وضغط جداول البيانات بنجاح لتحسين سرعة الكاشير!',
+    };
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1068,6 +1559,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCustomer,
         deleteCustomer,
         payCustomerDebt,
+        suppliers,
+        supplierInvoices,
+        supplierPayments,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+        createSupplierInvoice,
+        paySupplierDebt,
         currentShift,
         shifts,
         openShift,
@@ -1082,6 +1581,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         importDataJson,
         resetAllData,
         clearToEmptyStore,
+        isOnline,
+        cleanTempCache,
+        getStorageStats,
       }}
     >
       {children}

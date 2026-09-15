@@ -13,17 +13,19 @@ import {
   Users,
   PanelLeftClose,
   PanelLeftOpen,
+  Truck,
 } from 'lucide-react';
 import { ActiveTab } from '../../types';
 
 export const Sidebar: React.FC = () => {
-  const { t, activeTab, setActiveTab, products, customers, currentUser } = useApp();
+  const { t, activeTab, setActiveTab, products, customers, suppliers = [], currentUser } = useApp();
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return window.innerWidth < 1100;
   });
 
   const lowStockCount = products.filter((p) => p.stock <= p.minStock).length;
   const debtCustomersCount = customers.filter((c) => c.totalDebt > 0).length;
+  const supplierPayablesCount = suppliers.filter((s) => (s.totalPayable || 0) > 0).length;
 
   const navItems: {
     id: ActiveTab;
@@ -37,6 +39,7 @@ export const Sidebar: React.FC = () => {
     { id: 'pos', label: t.pos, icon: ShoppingCart },
     { id: 'debts', label: 'العملاء والآجل', icon: Users, badge: debtCustomersCount, badgeColor: 'bg-amber-500' },
     { id: 'invoices', label: t.invoices, icon: Receipt },
+    { id: 'suppliers', label: 'فواتير الموردين', icon: Truck, badge: supplierPayablesCount, badgeColor: 'bg-indigo-500' },
     { id: 'products', label: t.products, icon: Boxes },
     { id: 'stock-alerts', label: t.stockAlerts, icon: AlertTriangle, badge: lowStockCount },
     { id: 'expenses', label: t.expenses, icon: Wallet },

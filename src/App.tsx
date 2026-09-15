@@ -7,6 +7,7 @@ import { POSScreen } from './components/pos/POSScreen';
 import { ProductsScreen } from './components/products/ProductsScreen';
 import { StockAlertsScreen } from './components/stock/StockAlertsScreen';
 import { InvoicesScreen } from './components/invoices/InvoicesScreen';
+import { SuppliersScreen } from './components/suppliers/SuppliersScreen';
 import { ExpensesScreen } from './components/expenses/ExpensesScreen';
 import { DebtsScreen } from './components/customers/DebtsScreen';
 import { SessionsScreen } from './components/shifts/SessionsScreen';
@@ -31,6 +32,8 @@ const MainAppContent: React.FC = () => {
         return <StockAlertsScreen />;
       case 'invoices':
         return <InvoicesScreen />;
+      case 'suppliers':
+        return <SuppliersScreen />;
       case 'expenses':
         return <ExpensesScreen />;
       case 'sessions':

@@ -13,7 +13,12 @@ import {
   CheckCircle2,
   Monitor,
   X,
+  Activity,
+  Sparkles,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
+import { SystemHealthModal } from './SystemHealthModal';
 
 export const Header: React.FC = () => {
   const {
@@ -28,6 +33,7 @@ export const Header: React.FC = () => {
     closeShift,
     setActiveTab,
     settings,
+    isOnline,
   } = useApp();
 
   const [showShiftModal, setShowShiftModal] = useState(false);
@@ -36,6 +42,7 @@ export const Header: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showDesktopModal, setShowDesktopModal] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
 
   React.useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -97,10 +104,21 @@ export const Header: React.FC = () => {
               <h1 className="font-bold text-slate-900 text-lg leading-tight truncate">
                 {settings.storeName || t.appName}
               </h1>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                {t.offlineStatus}
-              </span>
+              <button
+                onClick={() => setShowHealthModal(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-300 transition-all cursor-pointer shadow-2xs group shrink-0"
+                title="حالة النظام: أوفلاين محلي نشط 100% • انقر لعرض فحص الأداء وتنظيف الذاكرة المؤقتة"
+              >
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="hidden sm:inline">
+                  {isOnline ? 'أوفلاين محلي (نشط 100%)' : 'أوفلاين كامل (بدون نت)'}
+                </span>
+                <span className="sm:hidden">أوفلاين نشط</span>
+                <Sparkles className="w-3 h-3 text-emerald-600 group-hover:rotate-12 transition-transform shrink-0" />
+              </button>
             </div>
             <p className="text-xs text-slate-500 truncate">{t.systemSubtitle}</p>
           </div>
@@ -150,6 +168,16 @@ export const Header: React.FC = () => {
           >
             <Monitor className="w-3.5 h-3.5 text-blue-600" />
             <span>تثبيت ديسكتوب</span>
+          </button>
+
+          {/* Quick Speed & Health Check */}
+          <button
+            onClick={() => setShowHealthModal(true)}
+            className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer border border-emerald-200/80"
+            title="فحص حالة الأداء وتنظيف الذاكرة المؤقتة"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            <span>تسريع وتنظيف</span>
           </button>
 
           {/* Quick POS action */}
@@ -408,6 +436,12 @@ export const Header: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* System Health & Cache Maintenance Modal */}
+      <SystemHealthModal
+        isOpen={showHealthModal}
+        onClose={() => setShowHealthModal(false)}
+      />
     </header>
   );
 };
