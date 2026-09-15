@@ -42,12 +42,7 @@ export const SettingsScreen: React.FC = () => {
   const [storeName, setStoreName] = useState(settings.storeName);
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
   const [storePhone, setStorePhone] = useState(settings.storePhone);
-  const [taxNumber, setTaxNumber] = useState(settings.taxNumber);
-  const [currency, setCurrency] = useState(settings.currency);
-  const [enableTax, setEnableTax] = useState(settings.enableTax);
-  const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [receiptFooter, setReceiptFooter] = useState(settings.receiptFooter);
-
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
   const [backupMessage, setBackupMessage] = useState('');
 
@@ -102,10 +97,10 @@ export const SettingsScreen: React.FC = () => {
       storeName,
       storeAddress,
       storePhone,
-      taxNumber,
-      currency,
-      enableTax,
-      taxRate: parseFloat(taxRate) || 0,
+      taxNumber: '',
+      currency: 'EGP',
+      enableTax: false,
+      taxRate: 0,
       receiptFooter,
     });
     setSaveSuccessMsg(true);
@@ -202,13 +197,9 @@ export const SettingsScreen: React.FC = () => {
                 <label className="block font-semibold text-slate-700 mb-1">
                   عملة الحسابات
                 </label>
-                <input
-                  type="text"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  placeholder="ج.م أو SAR أو $"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-700 font-bold">
+                  الجنيه المصري (ج.م)
+                </div>
               </div>
 
               <div>
@@ -233,44 +224,6 @@ export const SettingsScreen: React.FC = () => {
                   onChange={(e) => setStorePhone(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  الرقم الضريبي للمنشأة (إن وجد)
-                </label>
-                <input
-                  type="text"
-                  value={taxNumber}
-                  onChange={(e) => setTaxNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  نسبة الضريبة (%)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={taxRate}
-                    onChange={(e) => setTaxRate(e.target.value)}
-                    disabled={!enableTax}
-                    className="w-24 px-3 py-2 border border-slate-300 rounded-lg font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-slate-100"
-                  />
-                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={enableTax}
-                      onChange={(e) => setEnableTax(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>تفعيل احتساب الضريبة</span>
-                  </label>
-                </div>
               </div>
 
               <div className="sm:col-span-2">

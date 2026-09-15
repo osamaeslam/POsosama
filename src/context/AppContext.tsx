@@ -272,7 +272,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = appStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const savedSettings = JSON.parse(saved) as StoreSettings;
+        return {
+          ...savedSettings,
+          taxNumber: '',
+          taxRate: 0,
+          enableTax: false,
+          currency: 'EGP',
+        };
       } catch (e) {
         console.error(e);
       }
@@ -282,7 +289,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings((prev) => {
-      const updated = { ...prev, ...newSettings };
+      const updated = {
+        ...prev,
+        ...newSettings,
+        taxNumber: '',
+        taxRate: 0,
+        enableTax: false,
+        currency: 'EGP',
+      };
       appStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
       return updated;
     });
