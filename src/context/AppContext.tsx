@@ -28,12 +28,9 @@ import {
   initialShifts,
   initialStoreSettings,
   initialUsers,
-  initialCustomers,
-  initialDebtPayments,
-  initialSuppliers,
-  initialSupplierInvoices,
-  initialSupplierPayments,
-} from '../services/mockData';
+    initialCustomers,
+    initialDebtPayments,
+  } from '../services/mockData';
 import { translations } from '../locales/translations';
 
 interface CheckoutExtraOptions {
@@ -631,7 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSuppliers;
+    return [];
   });
 
   const saveSuppliers = (newSuppliers: Supplier[]) => {
@@ -682,7 +679,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSupplierInvoices;
+    return [];
   });
 
   const saveSupplierInvoices = (newInvoices: SupplierInvoice[]) => {
@@ -700,7 +697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return initialSupplierPayments;
+    return [];
   });
 
   const saveSupplierPayments = (newPayments: SupplierPayment[]) => {
@@ -987,7 +984,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error('كمية الصنف غير صحيحة');
       }
       if (Number.isFinite(stock) && quantity > stock) {
-        throw new Error(`الكمية المطلوبة من ${item.product.name} أكبر من المخزون المتاح`);
+        throw new Error(`الكمية المطلوبة من ${item.product.name} أك��ر من المخزون المتاح`);
       }
     }
 
