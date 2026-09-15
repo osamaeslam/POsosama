@@ -240,6 +240,10 @@ export const POSScreen: React.FC = () => {
           setCheckoutError('يرجى تحديد أو كتابة اسم العميل لتسجيل الفاتورة الآجلة');
           return;
         }
+        if (!creditCustomerPhone.trim()) {
+          setCheckoutError('يرجى كتابة رقم هاتف العميل لتسجيل الفاتورة الآجلة');
+          return;
+        }
         targetCustomerName = creditCustomerName.trim();
         targetCustomerPhone = creditCustomerPhone.trim();
       }
@@ -769,7 +773,7 @@ export const POSScreen: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-amber-900 mb-0.5">رقم الهاتف</label>
+                    <label className="block text-[11px] font-bold text-amber-900 mb-0.5">رقم الهاتف *</label>
                     <input
                       type="tel"
                       value={creditCustomerPhone}

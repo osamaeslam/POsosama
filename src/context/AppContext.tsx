@@ -1025,6 +1025,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     throw new Error('يرجى تحديد المحفظة الإلكترونية');
   }
 
+  if (paymentMethod === 'credit') {
+    if (!extra?.customerName?.trim()) {
+      throw new Error('لا يمكن تسجيل فاتورة آجلة بدون اسم العميل');
+    }
+    if (!extra?.customerPhone?.trim()) {
+      throw new Error('لا يمكن تسجيل فاتورة آجلة بدون رقم هاتف العميل');
+    }
+  }
+
   const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `${settings.invoicePrefix}-${nextInvNum}`;
     const saleId = `sale_${Date.now()}`;
