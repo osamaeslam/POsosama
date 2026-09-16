@@ -142,7 +142,7 @@ export const translations = {
     notes: 'ملاحظات',
   },
   en: {
-    appName: 'Osama Pos',
+    appName: 'Bayaa POS',
     systemSubtitle: 'Point of Sale & Retail Management (Local Offline)',
     dashboard: 'Dashboard',
     pos: 'Point of Sale',

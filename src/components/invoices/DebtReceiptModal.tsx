@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { DebtPayment, Customer } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { Printer, X, CheckCircle2, Phone, MapPin, User, Wallet, Banknote } from 'lucide-react';
@@ -15,17 +16,31 @@ export const DebtReceiptModal: React.FC<DebtReceiptModalProps> = ({
   onClose,
 }) => {
   const { settings } = useApp();
-  const printContentRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
+    document.body.classList.add('printing-modal');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-modal');
+    }, 1500);
   };
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      document.body.classList.remove('printing-modal');
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+      document.body.classList.remove('printing-modal');
+    };
+  }, []);
 
   const remainingDebt = customer ? customer.totalDebt : 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+      <div className="no-print bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -45,8 +60,7 @@ export const DebtReceiptModal: React.FC<DebtReceiptModalProps> = ({
         {/* Printable Card */}
         <div className="flex-1 overflow-y-auto py-4">
           <div
-            ref={printContentRef}
-            className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-slate-800 space-y-4 print:p-0 print:border-none print:bg-white"
+            className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-slate-800 space-y-4"
           >
             {/* Store Information */}
             <div className="text-center border-b border-dashed border-slate-300 pb-3">
@@ -159,6 +173,73 @@ export const DebtReceiptModal: React.FC<DebtReceiptModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Print Portal for Clean Receipt Print */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div className="print-only receipt-thermal-roll">
+            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+              <div style={{ fontWeight: '900', fontSize: '15px' }}>{settings.storeName}</div>
+              {settings.storeAddress && <div style={{ fontSize: '10px' }}>{settings.storeAddress}</div>}
+              {settings.storePhone && <div style={{ fontSize: '10px' }}>هاتف: {settings.storePhone}</div>}
+              <div style={{ margin: '4px 0', borderTop: '1px dashed #000' }}></div>
+              <div style={{ fontWeight: 'bold', fontSize: '12px' }}>[ سند قبض نقدية / سداد مديونية ]</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span>رقم السند:</span>
+                <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>{payment.receiptNumber}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>التاريخ:</span>
+                <span>{new Date(payment.createdAt).toLocaleString('ar-EG')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>الكاشير:</span>
+                <span>{payment.cashierName}</span>
+              </div>
+              <div style={{ margin: '4px 0', borderTop: '1px dashed #000' }}></div>
+            </div>
+
+            <div style={{ border: '1px solid #000', padding: '6px', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>العميل:</span>
+                <span style={{ fontWeight: 'bold' }}>{payment.customerName}</span>
+              </div>
+              {payment.customerPhone && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span>الهاتف:</span>
+                  <span style={{ fontFamily: 'monospace' }}>{payment.customerPhone}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '6px 0', margin: '6px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: '10px' }}>المبلغ المستلم المسدد:</div>
+              <div style={{ fontSize: '16px', fontWeight: '900' }}>
+                {payment.amount.toLocaleString()} {settings.currency}
+              </div>
+              <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                طريقة الدفع: {payment.paymentMethod === 'cash' ? 'نقداً (كاش بالخزينة)' : `محفظة إلكترونية (${payment.walletProvider || ''})`}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '11px', margin: '4px 0' }}>
+              <span>المتبقي على العميل:</span>
+              <span>{remainingDebt.toLocaleString()} {settings.currency}</span>
+            </div>
+
+            {payment.notes && (
+              <div style={{ fontSize: '9px', borderTop: '1px dotted #888', paddingTop: '4px', marginTop: '4px' }}>
+                ملاحظة: {payment.notes}
+              </div>
+            )}
+
+            <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '6px' }}>
+              <div style={{ fontWeight: 'bold' }}>{settings.receiptFooter || 'نسعد بخدمتكم دائماً • شكراً لزيارتكم'}</div>
+              <div style={{ fontSize: '8px', marginTop: '2px' }}>تم التوثيق والترحيل آلياً للخزينة</div>
+            </div>
+          </div>,
+          document.getElementById('print-root') || document.body
+        )}
     </div>
   );
 };

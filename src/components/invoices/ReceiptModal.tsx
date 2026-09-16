@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Sale } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { Printer, X, CheckCircle2, Phone, MapPin, UserCheck, Wallet, Banknote, Clock, Store, ShieldCheck, Tag } from 'lucide-react';
@@ -60,12 +61,28 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
   const [printFormat, setPrintFormat] = useState<'thermal' | 'a4'>('thermal');
 
   const handlePrint = async () => {
+    document.body.classList.add('printing-modal');
     if (printFormat === 'thermal' && window.bayaaDesktop?.isDesktop) {
       const printed = await window.bayaaDesktop.app.print();
+      document.body.classList.remove('printing-modal');
       if (printed) return;
     }
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-modal');
+    }, 1500);
   };
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      document.body.classList.remove('printing-modal');
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+      document.body.classList.remove('printing-modal');
+    };
+  }, []);
 
   const getPaymentBadge = () => {
     if (sale.paymentMethod === 'credit') {
@@ -434,160 +451,168 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, isNew
         </div>
       </div>
 
-      {/* Hidden container strictly for browser native window.print() */}
-      <div className="print-only text-black p-4 w-full">
-        {printFormat === 'thermal' ? (
-          <div style={{ maxWidth: '300px', margin: '0 auto', fontFamily: 'monospace, sans-serif', fontSize: '11px', color: '#000' }}>
-            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-              <div style={{ fontWeight: '900', fontSize: '16px', letterSpacing: '-0.5px' }}>{settings.storeName}</div>
-              {settings.storeAddress && <div style={{ fontSize: '10px' }}>{settings.storeAddress}</div>}
-              {settings.storePhone && <div style={{ fontSize: '10px', fontWeight: 'bold' }}>هاتف: {settings.storePhone}</div>}
-              {settings.taxNumber && <div style={{ fontSize: '9px' }}>الرقم الضريبي: {settings.taxNumber}</div>}
-              <div style={{ margin: '4px 0', borderTop: '1px dashed #000' }}></div>
-              <div style={{ fontWeight: 'bold', fontSize: '12px' }}>
-                {sale.isRefund ? '••• فاتورة مرتجع بضاعة •••' : `[ ${badge.label} ]`}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                <span>رقم الفاتورة:</span>
-                <span style={{ fontWeight: 'bold' }}>{sale.invoiceNumber}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>التاريخ:</span>
-                <span>{new Date(sale.createdAt).toLocaleString('ar-EG')}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>الكاشير:</span>
-                <span>{sale.cashierName}</span>
-              </div>
-              {sale.customerName && (
-                <div style={{ fontWeight: 'bold', marginTop: '4px', textAlign: 'right', background: '#f5f5f5', padding: '3px 6px' }}>
-                  العميل: {sale.customerName} {sale.customerPhone ? `(${sale.customerPhone})` : ''}
-                </div>
-              )}
-              <div style={{ margin: '6px 0', borderTop: '1px dashed #000' }}></div>
-            </div>
-            <table style={{ width: '100%', textAlign: 'right', fontSize: '11px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px dashed #000' }}>
-                  <th style={{ paddingBottom: '3px' }}>الصنف</th>
-                  <th style={{ textAlign: 'center', paddingBottom: '3px' }}>الكمية</th>
-                  <th style={{ textAlign: 'center', paddingBottom: '3px' }}>السعر</th>
-                  <th style={{ textAlign: 'left', paddingBottom: '3px' }}>الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sale.items.map((i) => (
-                  <tr key={i.id} style={{ borderBottom: '1px dotted #ccc' }}>
-                    <td style={{ padding: '3px 0' }}>{i.productName}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{i.quantity}</td>
-                    <td style={{ textAlign: 'center', fontSize: '10px' }}>{i.unitPrice}</td>
-                    <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{i.subtotal}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ marginTop: '8px', borderTop: '1px dashed #000', paddingTop: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>المجموع الفرعي:</span>
-                <span>{sale.subtotal} {settings.currency}</span>
-              </div>
-              {sale.discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>خصم ممنوح:</span>
-                  <span>-{sale.discount} {settings.currency}</span>
-                </div>
-              )}
-              {sale.tax > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>الضريبة ({settings.taxRate}%):</span>
-                  <span>+{sale.tax} {settings.currency}</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', marginTop: '6px', borderTop: '1px solid #000', borderBottom: '1px solid #000', padding: '4px 0' }}>
-                <span>إجمالي الحساب:</span>
-                <span>{sale.total} {settings.currency}</span>
-              </div>
-              {sale.paymentMethod === 'cash' && sale.cashReceived !== undefined && (
-                <div style={{ marginTop: '4px', fontSize: '10px' }}>
+      {/* Print Portal: Rendered cleanly into #print-root so no background UI or backdrops bleed into printout */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div className={`print-only ${printFormat === 'thermal' ? 'receipt-thermal-roll' : 'receipt-a4-page'}`}>
+            {printFormat === 'thermal' ? (
+              <div style={{ width: '100%', maxWidth: '76mm', margin: '0 auto', fontFamily: "'Cairo', 'Arial', 'Tahoma', system-ui, sans-serif", fontSize: '11px', color: '#000', direction: 'rtl' }}>
+                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontWeight: '900', fontSize: '16px', letterSpacing: '-0.3px', color: '#000' }}>{settings.storeName}</div>
+                  {settings.storeAddress && <div style={{ fontSize: '10px', color: '#000' }}>{settings.storeAddress}</div>}
+                  {settings.storePhone && <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000' }}>هاتف: {settings.storePhone}</div>}
+                  {settings.taxNumber && <div style={{ fontSize: '9px', color: '#000' }}>الرقم الضريبي: {settings.taxNumber}</div>}
+                  <div style={{ margin: '4px 0', borderTop: '1px dashed #000' }}></div>
+                  <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#000' }}>
+                    {sale.isRefund ? '••• فاتورة مرتجع بضاعة •••' : `[ ${badge.label} ]`}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <span>رقم الفاتورة:</span>
+                    <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>{sale.invoiceNumber}</span>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>المدفوع نقداً:</span>
-                    <span>{sale.cashReceived} {settings.currency}</span>
+                    <span>التاريخ:</span>
+                    <span>{new Date(sale.createdAt).toLocaleString('ar-EG')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                    <span>المتبقي للعميل (فكة):</span>
-                    <span>{sale.changeGiven || 0} {settings.currency}</span>
-                  </div>
-                </div>
-              )}
-              {sale.paymentMethod === 'credit' && (
-                <div style={{ marginTop: '6px', border: '1px solid #000', padding: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>المدفوع مقدماً:</span>
-                    <span>{sale.creditPaidAmount || 0} {settings.currency}</span>
+                    <span>الكاشير:</span>
+                    <span>{sale.cashierName}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                    <span>المتبقي دين على العميل:</span>
-                    <span>{sale.creditRemainingDebt || 0} {settings.currency}</span>
+                  {sale.customerName && (
+                    <div style={{ fontWeight: 'bold', marginTop: '4px', textAlign: 'right', border: '1px solid #000', padding: '2px 4px' }}>
+                      العميل: {sale.customerName} {sale.customerPhone ? `(${sale.customerPhone})` : ''}
+                    </div>
+                  )}
+                  <div style={{ margin: '6px 0', borderTop: '1px dashed #000' }}></div>
+                </div>
+                <table style={{ width: '100%', textAlign: 'right', fontSize: '11px', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px dashed #000' }}>
+                      <th style={{ paddingBottom: '3px', textAlign: 'right' }}>الصنف</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '3px' }}>الكمية</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '3px' }}>السعر</th>
+                      <th style={{ textAlign: 'left', paddingBottom: '3px' }}>الإجمالي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sale.items.map((i) => (
+                      <tr key={i.id} style={{ borderBottom: '1px dotted #888' }}>
+                        <td style={{ padding: '3px 0' }}>{i.productName}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{i.quantity}</td>
+                        <td style={{ textAlign: 'center', fontSize: '10px' }}>{i.price.toLocaleString()}</td>
+                        <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{i.subtotal.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: '8px', borderTop: '1px dashed #000', paddingTop: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>المجموع الفرعي:</span>
+                    <span>{sale.subtotal.toLocaleString()} {settings.currency}</span>
+                  </div>
+                  {sale.discount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>خصم ممنوح:</span>
+                      <span>-{sale.discount.toLocaleString()} {settings.currency}</span>
+                    </div>
+                  )}
+                  {sale.tax > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>الضريبة ({settings.taxRate}%):</span>
+                      <span>+{sale.tax.toLocaleString()} {settings.currency}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '14px', marginTop: '6px', borderTop: '2px solid #000', borderBottom: '2px solid #000', padding: '4px 0' }}>
+                    <span>إجمالي الحساب:</span>
+                    <span>{sale.total.toLocaleString()} {settings.currency}</span>
+                  </div>
+                  {sale.paymentMethod === 'cash' && sale.cashReceived !== undefined && (
+                    <div style={{ marginTop: '4px', fontSize: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>المدفوع نقداً:</span>
+                        <span>{sale.cashReceived.toLocaleString()} {settings.currency}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                        <span>المتبقي للعميل (فكة):</span>
+                        <span>{(sale.changeGiven || 0).toLocaleString()} {settings.currency}</span>
+                      </div>
+                    </div>
+                  )}
+                  {sale.paymentMethod === 'credit' && (
+                    <div style={{ marginTop: '6px', border: '1px solid #000', padding: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>المدفوع مقدماً:</span>
+                        <span>{(sale.creditPaidAmount || 0).toLocaleString()} {settings.currency}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                        <span>المتبقي دين على العميل:</span>
+                        <span>{(sale.creditRemainingDebt || 0).toLocaleString()} {settings.currency}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                  <InvoiceQRCode value={sale.invoiceNumber} />
+                  <InvoiceBarcode value={sale.invoiceNumber} />
+                </div>
+
+                <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '6px' }}>
+                  <div style={{ fontWeight: 'bold' }}>{settings.receiptFooter || 'نسعد بخدمتكم دائماً • شكراً لزيارتكم'}</div>
+                  <div style={{ fontSize: '8px', marginTop: '2px' }}>البضاعة المباعة ترد وتستبدل خلال 14 يوماً مع أصل الفاتورة</div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '20px', fontFamily: "'Cairo', system-ui, sans-serif", direction: 'rtl' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>{settings.storeName}</h2>
+                    <p style={{ fontSize: '12px' }}>{settings.storeAddress} - {settings.storePhone}</p>
+                    <p style={{ fontSize: '13px', fontWeight: 'bold', marginTop: '4px' }}>{badge.label}</p>
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 'bold', fontFamily: 'monospace' }}>{sale.invoiceNumber}</h3>
+                    <p style={{ fontSize: '12px' }}>{new Date(sale.createdAt).toLocaleString('ar-EG')}</p>
+                    {sale.customerName && <p style={{ fontSize: '12px', fontWeight: 'bold' }}>العميل: {sale.customerName}</p>}
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div style={{ textAlign: 'center', marginTop: '10px' }}>
-              <InvoiceQRCode value={sale.invoiceNumber} />
-              <InvoiceBarcode value={sale.invoiceNumber} />
-            </div>
-
-            <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '6px' }}>
-              <div style={{ fontWeight: 'bold' }}>{settings.receiptFooter || 'نسعد بخدمتكم دائماً • شكراً لزيارتكم'}</div>
-              <div style={{ fontSize: '8px', marginTop: '2px' }}>البضاعة المباعة ترد وتستبدل خلال 14 يوماً مع أصل الفاتورة</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
-              <div>
-                <h2>{settings.storeName}</h2>
-                <p>{settings.storeAddress} - {settings.storePhone}</p>
-                <p><strong>{badge.label}</strong></p>
-              </div>
-              <div style={{ textAlign: 'left' }}>
-                <h3>{sale.invoiceNumber}</h3>
-                <p>{new Date(sale.createdAt).toLocaleString('ar-EG')}</p>
-                {sale.customerName && <p>العميل: {sale.customerName}</p>}
-              </div>
-            </div>
-            <table style={{ width: '100%', marginTop: '20px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#eee' }}>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>المنتج</th>
-                  <th style={{ padding: '8px', textAlign: 'center' }}>الكمية</th>
-                  <th style={{ padding: '8px', textAlign: 'left' }}>السعر</th>
-                  <th style={{ padding: '8px', textAlign: 'left' }}>الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sale.items.map((it) => (
-                  <tr key={it.id} style={{ borderBottom: '1px solid #ddd' }}>
-                    <td style={{ padding: '8px' }}>{it.productName}</td>
-                    <td style={{ padding: '8px', textAlign: 'center' }}>{it.quantity}</td>
-                    <td style={{ padding: '8px', textAlign: 'left' }}>{it.price}</td>
-                    <td style={{ padding: '8px', textAlign: 'left' }}>{it.subtotal}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ marginTop: '20px', textAlign: 'left', fontWeight: 'bold' }}>
-              المجموع الإجمالي: {sale.total} {settings.currency}
-              {sale.paymentMethod === 'credit' && (
-                <div style={{ color: '#b91c1c', marginTop: '6px' }}>
-                  المسجل كمديونية آجلة: {sale.creditRemainingDebt} {settings.currency}
+                <table style={{ width: '100%', marginTop: '20px', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>المنتج</th>
+                      <th style={{ padding: '8px', textAlign: 'center' }}>الكمية</th>
+                      <th style={{ padding: '8px', textAlign: 'center' }}>السعر</th>
+                      <th style={{ padding: '8px', textAlign: 'left' }}>الإجمالي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sale.items.map((it) => (
+                      <tr key={it.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '8px' }}>{it.productName}</td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>{it.quantity}</td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>{it.price.toLocaleString()} {settings.currency}</td>
+                        <td style={{ padding: '8px', textAlign: 'left', fontWeight: 'bold' }}>{it.subtotal.toLocaleString()} {settings.currency}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #333', paddingTop: '10px' }}>
+                  <div style={{ fontSize: '12px' }}>
+                    {sale.paymentMethod === 'credit' && (
+                      <div style={{ color: '#b91c1c', fontWeight: 'bold' }}>
+                        المتبقي كمديونية آجلة: {(sale.creditRemainingDebt || 0).toLocaleString()} {settings.currency}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'left', fontWeight: 'bold', fontSize: '16px' }}>
+                    المجموع الإجمالي: {sale.total.toLocaleString()} {settings.currency}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </div>,
+          document.getElementById('print-root') || document.body
         )}
-      </div>
     </div>
   );
 };

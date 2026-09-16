@@ -61,62 +61,85 @@
 }
 
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
-  }
-  .no-print {
-    display: none !important;
-  }
-  .print-only {
-    display: block !important;
-  }
-  @page {
-    margin: 0.5cm;
-    size: auto;
-  }
-
-  .print-thermal {
-    position: static !important;
-    display: block !important;
-    width: 80mm !important;
-    min-width: 80mm !important;
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* When printing from modal receipt portal, hide root app completely */
+  body.printing-modal #root,
+  body:has(#print-root:not(:empty)) #root {
+    display: none !important;
+  }
+
+  #print-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     overflow: visible !important;
   }
 
-  .print-thermal > .no-print {
+  .no-print {
     display: none !important;
   }
 
-  .print-thermal > :not(.no-print) {
+  .print-only {
     display: block !important;
-    width: 80mm !important;
-    max-width: 80mm !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    background: white !important;
   }
 
-  .print-thermal table {
-    width: 100% !important;
-  }
-
-  @page thermal {
-    size: 80mm auto;
+  @page {
     margin: 0;
+    size: auto;
   }
 
-  .print-thermal {
-    page: thermal;
+  .receipt-thermal-roll {
+    width: 76mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 3mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Cairo', 'Arial', 'Tahoma', system-ui, sans-serif !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    direction: rtl !important;
+    text-align: right !important;
+  }
+
+  .receipt-thermal-roll * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+
+  .receipt-a4-page {
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 8mm 12mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Cairo', system-ui, sans-serif !important;
+    direction: rtl !important;
   }
 }
 
 @media screen {
+  #print-root {
+    display: none !important;
+  }
+
   .app-shell [class*="overflow-x-auto"] {
     scrollbar-width: thin;
   }

@@ -25,7 +25,10 @@ export const InvoicesScreen: React.FC = () => {
   // Refund dialog state
   const [refundingSale, setRefundingSale] = useState<Sale | null>(null);
   const [refundQuantities, setRefundQuantities] = useState<Record<string, number>>({});
+  const [refundMode, setRefundMode] = useState<'cash' | 'debt_deduction'>('cash');
+  const [refundNotes, setRefundNotes] = useState('');
   const [refundSuccessMsg, setRefundSuccessMsg] = useState<string | null>(null);
+  const [refundErrorMsg, setRefundErrorMsg] = useState<string | null>(null);
 
   // Filter invoices
   const filteredSales = sales.filter((s) => {
@@ -44,6 +47,9 @@ export const InvoicesScreen: React.FC = () => {
 
   const openRefundModal = (sale: Sale) => {
     setRefundingSale(sale);
+    setRefundMode('cash');
+    setRefundNotes('');
+    setRefundErrorMsg(null);
     // Initialize refund quantities with available remaining quantities
     const initial: Record<string, number> = {};
     sale.items.forEach((item) => {
@@ -56,18 +62,32 @@ export const InvoicesScreen: React.FC = () => {
   const handleRefundSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!refundingSale) return;
+    setRefundErrorMsg(null);
 
     const itemsToRefund = Object.entries(refundQuantities)
       .map(([productId, quantity]) => ({ productId, quantity: Number(quantity) || 0 }))
       .filter((i) => i.quantity > 0);
 
-    if (itemsToRefund.length === 0) return;
+    if (itemsToRefund.length === 0) {
+      setRefundErrorMsg('يرجى تحديد كمية صنف واحد على الأقل للاسترجاع');
+      return;
+    }
 
-    const refund = processRefund(refundingSale.id, itemsToRefund);
-    if (refund) {
-      setRefundingSale(null);
-      setRefundSuccessMsg(`تم استرجاع الأصناف بنجاح! رقم إشعار الرد: ${refund.invoiceNumber}`);
-      setTimeout(() => setRefundSuccessMsg(null), 4000);
+    try {
+      const refund = processRefund(refundingSale.id, itemsToRefund, {
+        refundMode,
+        notes: refundNotes.trim() || undefined,
+      });
+
+      if (refund) {
+        setRefundingSale(null);
+        setRefundSuccessMsg(`تم استرجاع الأصناف وصرف النقدية بنجاح! رقم إشعار الرد: ${refund.invoiceNumber}`);
+        setTimeout(() => setRefundSuccessMsg(null), 4000);
+      } else {
+        setRefundErrorMsg('تعذر إتمام عملية الاسترجاع، يرجى مراجعة الكميات');
+      }
+    } catch (err) {
+      setRefundErrorMsg(err instanceof Error ? err.message : 'حدث خطأ أثناء الاسترجاع');
     }
   };
 
@@ -307,82 +327,159 @@ export const InvoicesScreen: React.FC = () => {
       )}
 
       {/* Refund Modal */}
-      {refundingSale && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={handleRefundSubmit}
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <RotateCcw className="w-4 h-4 text-rose-600" />
-                <span>استرجاع من الفاتورة ({refundingSale.invoiceNumber})</span>
-              </h3>
-            </div>
+      {refundingSale && (() => {
+        const discountRatio =
+          refundingSale.subtotal > 0 ? refundingSale.total / refundingSale.subtotal : 1;
+        const estimatedRefundTotal = Object.entries(refundQuantities).reduce((sum, [pId, qty]) => {
+          const item = refundingSale.items.find((i) => i.productId === pId);
+          if (!item || !qty) return sum;
+          return sum + Math.round(item.price * Number(qty) * discountRatio * 100) / 100;
+        }, 0);
 
-            <p className="text-xs text-slate-600 mb-4">
-              حدد الكميات المراد استرجاعها. سيتم إرجاع البضاعة تلقائياً إلى رصيد المخزن وخصم القيمة من مبيعات اليوم.
-            </p>
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <form
+              onSubmit={handleRefundSubmit}
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-rose-600" />
+                  <span>استرجاع من الفاتورة ({refundingSale.invoiceNumber})</span>
+                </h3>
+                <span className="text-xs text-slate-500 font-mono">
+                  {new Date(refundingSale.createdAt).toLocaleDateString('ar-EG')}
+                </span>
+              </div>
 
-            <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
-              {refundingSale.items.map((item) => {
-                const maxRefundable = item.quantity - (item.refundedQuantity || 0);
-                const currentRefundQty = refundQuantities[item.productId] || 0;
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                حدد الكميات المراد استرجاعها. يتم رد البضاعة تلقائياً للمخزن وتحديث عهدة الوردية والمبيعات بدقة 100%.
+              </p>
 
-                if (maxRefundable <= 0) return null;
+              {/* Refund Items List */}
+              <div className="space-y-3 mb-4 max-h-52 overflow-y-auto pr-1">
+                {refundingSale.items.map((item) => {
+                  const maxRefundable = item.quantity - (item.refundedQuantity || 0);
+                  const currentRefundQty = refundQuantities[item.productId] || 0;
 
-                return (
-                  <div
-                    key={item.id}
-                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-slate-900 truncate">{item.productName}</div>
-                      <div className="text-[11px] text-slate-500">
-                        السعر: {item.price.toLocaleString()} {settings.currency} | المتاح للاسترجاع: {maxRefundable}
+                  if (maxRefundable <= 0) return null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{item.productName}</div>
+                        <div className="text-[11px] text-slate-500">
+                          السعر: {item.price.toLocaleString()} {settings.currency} | المتاح للاسترجاع: {maxRefundable}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-slate-500 font-semibold">كمية الرد:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={maxRefundable}
+                          value={currentRefundQty}
+                          onChange={(e) => {
+                            const val = Math.min(
+                              maxRefundable,
+                              Math.max(0, parseInt(e.target.value, 10) || 0)
+                            );
+                            setRefundQuantities((prev) => ({ ...prev, [item.productId]: val }));
+                          }}
+                          className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold text-xs bg-white focus:outline-none focus:ring-1 focus:ring-rose-500"
+                        />
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] text-slate-500 font-semibold">كمية الرد:</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={maxRefundable}
-                        value={currentRefundQty}
-                        onChange={(e) => {
-                          const val = Math.min(
-                            maxRefundable,
-                            Math.max(0, parseInt(e.target.value, 10) || 0)
-                          );
-                          setRefundQuantities((prev) => ({ ...prev, [item.productId]: val }));
-                        }}
-                        className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold text-xs bg-white"
-                      />
-                    </div>
+              {/* Total Refund Value Preview */}
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 flex items-center justify-between text-xs mb-3">
+                <div>
+                  <div className="font-bold text-rose-900">إجمالي قيمة المرتجع المستحقة:</div>
+                  <div className="text-[11px] text-rose-700 mt-0.5">
+                    {refundMode === 'cash'
+                      ? 'صرف نقدي (كاش) فوراً من درج الخزينة'
+                      : 'خصم من رصيد دين العميل الآجل'}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+                <div className="text-xl font-black text-rose-700 font-mono">
+                  {estimatedRefundTotal.toLocaleString()} {settings.currency}
+                </div>
+              </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setRefundingSale(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm cursor-pointer"
-              >
-                تأكيد الاسترجاع واستعادة المخزن
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              {/* If Credit sale, choose Cash or Debt reduction */}
+              {refundingSale.paymentMethod === 'credit' && refundingSale.customerId && (
+                <div className="mb-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                  <div className="font-bold text-slate-700">طريقة رد المبلغ:</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRefundMode('cash')}
+                      className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                        refundMode === 'cash'
+                          ? 'border-rose-500 bg-rose-50 text-rose-800 font-bold'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      💵 صرف كاش من الخزينة
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRefundMode('debt_deduction')}
+                      className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                        refundMode === 'debt_deduction'
+                          ? 'border-blue-500 bg-blue-50 text-blue-800 font-bold'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      📉 خصم من دين العميل
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Cash from drawer notice */}
+              {refundMode === 'cash' && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span>
+                    المرتجع نقدي: يتم خصم المبلغ تلقائياً من نقدية الدرج الحالية في الوردية لضمان مطابقة الكاش عند الجرد.
+                  </span>
+                </div>
+              )}
+
+              {refundErrorMsg && (
+                <div className="p-2.5 bg-rose-100 border border-rose-300 rounded-xl text-xs font-bold text-rose-800 mb-3">
+                  {refundErrorMsg}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setRefundingSale(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={estimatedRefundTotal <= 0}
+                  className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                >
+                  تأكيد الاسترجاع وصرف النقدية ({estimatedRefundTotal.toLocaleString()} {settings.currency})
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      })()}
 
       {/* Receipt Modal */}
       {selectedSaleForReceipt && (

@@ -47,11 +47,16 @@ export const DashboardScreen: React.FC = () => {
   const todayRefundsTotal = todayRefunds.reduce((sum, s) => sum + s.total, 0);
   const todayRevenue = Math.max(0, todayGrossRevenue - todayRefundsTotal);
 
-  // Profit calculation (Sale Price - Cost)
-  const todayProfit = todaySales.reduce((sum, s) => {
-    const saleCost = s.items.reduce((c, it) => c + (it.cost || 0) * it.quantity, 0);
-    return sum + (s.total - saleCost);
-  }, 0) - todayRefundsTotal;
+  // Profit calculation (Net Revenue - Net Cost of goods sold)
+  const todayNetCost = todaySales.reduce((sum, s) => {
+    const saleCost = s.items.reduce((c, it) => {
+      const netQty = Math.max(0, it.quantity - (it.refundedQuantity || 0));
+      return c + (it.cost || 0) * netQty;
+    }, 0);
+    return sum + saleCost;
+  }, 0);
+
+  const todayProfit = Math.max(0, todayRevenue - todayNetCost);
 
   const todayExpenses = expenses
     .filter((e) => e.createdAt.startsWith(todayStr))
@@ -59,7 +64,7 @@ export const DashboardScreen: React.FC = () => {
 
   const lowStockProducts = products.filter((p) => p.stock <= p.minStock);
 
-  // Last 7 days chart data
+  // Last 7 days chart data (Net Sales after deducting refunds for each day)
   const last7Days = Array.from({ length: 7 }).map((_, idx) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - idx));
@@ -67,7 +72,12 @@ export const DashboardScreen: React.FC = () => {
     const daySalesList = sales.filter(
       (s) => !s.isRefund && s.createdAt.startsWith(dStr)
     );
-    const dayTotal = daySalesList.reduce((acc, s) => acc + s.total, 0);
+    const dayRefundsList = sales.filter(
+      (s) => s.isRefund && s.createdAt.startsWith(dStr)
+    );
+    const dayGross = daySalesList.reduce((acc, s) => acc + s.total, 0);
+    const dayRefunds = dayRefundsList.reduce((acc, s) => acc + s.total, 0);
+    const dayTotal = Math.max(0, dayGross - dayRefunds);
     return {
       dayName: d.toLocaleDateString('ar-EG', { weekday: 'short' }),
       date: dStr,

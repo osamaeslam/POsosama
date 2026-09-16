@@ -49,6 +49,9 @@ interface AppContextType {
   currentUser: User;
   setCurrentUser: (user: User) => void;
   users: User[];
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => { success: boolean; error?: string };
+  logout: () => void;
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
 
@@ -131,7 +134,11 @@ interface AppContextType {
     notes?: string,
     extra?: CheckoutExtraOptions
   ) => Sale;
-  processRefund: (saleId: string, refundedItems: { productId: string; quantity: number }[]) => Sale | null;
+  processRefund: (
+    saleId: string,
+    refundedItems: { productId: string; quantity: number }[],
+    options?: { refundMode?: 'cash' | 'debt_deduction'; notes?: string }
+  ) => Sale | null;
 
   // Expenses
   expenses: Expense[];
@@ -232,7 +239,31 @@ const STORAGE_KEYS = {
   SUPPLIER_PAYMENTS: 'bayaa_pos_supplier_payments',
   INITIALIZED: 'bayaa_pos_initialized_v2',
   LAST_EVENT_TIME: 'bayaa_pos_last_event_time',
+  CLEAN_PROD_READY: 'bayaa_pos_clean_production_ready_v1',
+  IS_AUTHENTICATED: 'bayaa_pos_is_authenticated_v1',
 };
+
+// Purge any legacy sample/demo data from previous test sessions so the store is 100% clean for real use
+const ensureCleanProductionState = () => {
+  try {
+    const isCleaned = appStorage.getItem(STORAGE_KEYS.CLEAN_PROD_READY);
+    if (!isCleaned) {
+      appStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.DEBT_PAYMENTS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIER_INVOICES, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.SUPPLIER_PAYMENTS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
+      appStorage.setItem(STORAGE_KEYS.CLEAN_PROD_READY, 'true');
+    }
+  } catch (err) {
+    console.warn('Production clean init check error:', err);
+  }
+};
+ensureCleanProductionState();
 
 // Keeps local timestamps monotonic when an offline device clock is stale or moved backwards.
 const getSafeTimestamp = (): string => {
@@ -307,7 +338,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = appStorage.getItem(STORAGE_KEYS.USERS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((u: User) => ({
+            ...u,
+            password: u.password || '123',
+          }));
+        }
       } catch (e) {
         console.error(e);
       }
@@ -324,9 +361,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return users[0] || initialUsers[0];
   });
 
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return appStorage.getItem(STORAGE_KEYS.IS_AUTHENTICATED) === 'true';
+  });
+
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
     appStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
+  };
+
+  const login = (username: string, password: string): { success: boolean; error?: string } => {
+    const trimmed = username.trim().toLowerCase();
+    const user = users.find((u) => u.username.toLowerCase() === trimmed);
+    if (!user) {
+      return { success: false, error: 'اسم المستخدم غير موجود' };
+    }
+    const expectedPassword = user.password || '123';
+    if (password !== expectedPassword) {
+      return { success: false, error: 'كلمة المرور غير صحيحة' };
+    }
+    setCurrentUserState(user);
+    appStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
+    setIsAuthenticated(true);
+    appStorage.setItem(STORAGE_KEYS.IS_AUTHENTICATED, 'true');
+    return { success: true };
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    appStorage.removeItem(STORAGE_KEYS.IS_AUTHENTICATED);
   };
 
   // 5. Categories
@@ -1189,7 +1252,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const processRefund = (
     saleId: string,
-    refundedItems: { productId: string; quantity: number }[]
+    refundedItems: { productId: string; quantity: number }[],
+    options?: { refundMode?: 'cash' | 'debt_deduction'; notes?: string }
   ): Sale | null => {
     if (!currentShift) {
       throw new Error('يجب فتح وردية قبل تسجيل المرتجعات');
@@ -1198,37 +1262,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const originalSale = sales.find((s) => s.id === saleId);
     if (!originalSale) return null;
 
-    let refundTotal = 0;
+    // Check existing refunds for this sale to avoid double refunding beyond the invoice total
+    const existingRefunds = sales.filter((s) => s.isRefund && s.originalSaleId === saleId);
+    const alreadyRefundedAmount = existingRefunds.reduce((sum, r) => sum + r.total, 0);
+    const maxRefundableAmount = Math.max(0, originalSale.total - alreadyRefundedAmount);
+
+    let calculatedRefundTotal = 0;
     const itemsToRefund: SaleItem[] = [];
+
+    // Calculate effective price per item taking into account any overall invoice discounts or taxes
+    const discountRatio =
+      originalSale.subtotal > 0 ? originalSale.total / originalSale.subtotal : 1;
 
     refundedItems.forEach(({ productId, quantity }) => {
       const originalItem = originalSale.items.find((i) => i.productId === productId);
-      const safeQuantity = Number(quantity);
+      const safeQuantity = Math.floor(Number(quantity) || 0);
       const alreadyRefunded = originalItem?.refundedQuantity || 0;
       const refundableQuantity = originalItem ? Math.max(0, originalItem.quantity - alreadyRefunded) : 0;
-      if (originalItem && Number.isInteger(safeQuantity) && safeQuantity > 0 && safeQuantity <= refundableQuantity) {
-        const itemRefundTotal = originalItem.price * safeQuantity;
-        refundTotal += itemRefundTotal;
+
+      if (originalItem && safeQuantity > 0 && safeQuantity <= refundableQuantity) {
+        const itemRefundTotal = Math.round(originalItem.price * safeQuantity * discountRatio * 100) / 100;
+        calculatedRefundTotal += itemRefundTotal;
         itemsToRefund.push({
           ...originalItem,
           id: `ref_item_${Date.now()}_${productId}`,
           quantity: safeQuantity,
+          price: originalItem.price,
           subtotal: itemRefundTotal,
           refundedQuantity: safeQuantity,
         });
       }
     });
 
-    if (itemsToRefund.length === 0) return null;
+    if (itemsToRefund.length === 0 || calculatedRefundTotal <= 0) return null;
+
+    // Ensure total refund cannot exceed remaining payable total on the original invoice
+    const finalRefundTotal = Math.min(calculatedRefundTotal, maxRefundableAmount);
+    if (finalRefundTotal <= 0) return null;
 
     const nextInvNum = (settings.lastInvoiceNumber || 1000) + 1;
     const invoiceNumber = `REF-${nextInvNum}`;
 
+    // Standard POS rule: All returns default to CASH paid directly from drawer treasury
+    const isCashRefund = options?.refundMode !== 'debt_deduction';
+
     const refundSale: Sale = {
       id: `refund_${Date.now()}`,
       invoiceNumber,
-      total: refundTotal,
-      subtotal: refundTotal,
+      total: finalRefundTotal,
+      subtotal: finalRefundTotal,
       tax: 0,
       discount: 0,
       createdAt: getSafeTimestamp(),
@@ -1238,14 +1320,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isRefund: true,
       originalSaleId: saleId,
       shiftId: currentShift.id,
-      paymentMethod: originalSale.paymentMethod,
+      paymentMethod: isCashRefund ? 'cash' : 'credit',
+      cashReceived: isCashRefund ? finalRefundTotal : 0,
+      changeGiven: 0,
       customerId: originalSale.customerId,
       customerName: originalSale.customerName,
       customerPhone: originalSale.customerPhone,
+      notes: options?.notes || (isCashRefund ? 'مرتجع نقدي منصرف من الخزينة' : 'مرتجع مخصوم من حساب الآجل'),
       items: itemsToRefund,
     };
 
-    // 1. Restore product stock
+    // 1. Restore product stock in inventory
     const updatedProducts = products.map((p) => {
       const returned = itemsToRefund.find((item) => item.productId === p.id);
       if (returned) {
@@ -1259,7 +1344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     saveProducts(updatedProducts);
 
-    // 2. Mark refunded quantity on original sale
+    // 2. Mark refunded quantity on original sale items
     const updatedSales = sales.map((s) => {
       if (s.id === saleId) {
         const updatedItems = s.items.map((item) => {
@@ -1280,23 +1365,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     saveSales([refundSale, ...updatedSales]);
 
-    // 3. Deduct from customer's debt if original sale was credit!
-    if (originalSale.paymentMethod === 'credit' && originalSale.customerId) {
+    // 3. Financial Handling: Cash drawer deduction vs debt reduction
+    if (isCashRefund) {
+      // CASH directly out of drawer treasury! Deduct from active shift:
+      const updatedShifts = shifts.map((s) =>
+        s.id === currentShift.id
+          ? { ...s, totalRefunds: (s.totalRefunds || 0) + finalRefundTotal }
+          : s
+      );
+      saveShifts(updatedShifts);
+    } else if (originalSale.customerId) {
+      // Deduct from customer's outstanding debt
       const customer = customers.find((c) => c.id === originalSale.customerId);
       if (customer) {
         const updatedCustomer: Customer = {
           ...customer,
-          totalDebt: Math.max(0, customer.totalDebt - refundTotal),
+          totalDebt: Math.max(0, (customer.totalDebt || 0) - finalRefundTotal),
           updatedAt: new Date().toISOString(),
         };
         saveCustomers(customers.map((c) => (c.id === customer.id ? updatedCustomer : c)));
       }
-    } else if (currentShift && originalSale.paymentMethod === 'cash') {
-      // Cash refunded from drawer
-      const updatedShifts = shifts.map((s) =>
-        s.id === currentShift.id ? { ...s, totalRefunds: s.totalRefunds + refundTotal } : s
-      );
-      saveShifts(updatedShifts);
     }
 
     updateSettings({ lastInvoiceNumber: nextInvNum });
@@ -1366,7 +1454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 12. Backup, Restore & Reset
   const exportDataJson = () => {
     const payload = {
-      appName: 'Osama Pos',
+      appName: 'Bayaa POS',
       version: '2.2.0',
       exportDate: new Date().toISOString(),
       settings,
@@ -1386,7 +1474,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `osama-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `bayaa-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1625,6 +1713,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         setCurrentUser,
         users,
+        isAuthenticated,
+        login,
+        logout,
         activeTab,
         setActiveTab,
         settings,

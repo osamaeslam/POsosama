@@ -20,7 +20,6 @@ export const ReportsScreen: React.FC = () => {
   // Filter sales according to timeframe
   const now = new Date();
   const filteredSales = sales.filter((s) => {
-    if (s.isRefund) return false;
     const saleDate = new Date(s.createdAt);
 
     if (timeframe === 'today') {
@@ -50,11 +49,14 @@ export const ReportsScreen: React.FC = () => {
   const totalRevenue = netRevenue;
 
   const totalCost = salesList.reduce((sum, s) => {
-    const saleCost = s.items.reduce((c, it) => c + (it.cost || 0) * (it.quantity - (it.refundedQuantity || 0)), 0);
+    const saleCost = s.items.reduce(
+      (c, it) => c + (it.cost || 0) * Math.max(0, it.quantity - (it.refundedQuantity || 0)),
+      0
+    );
     return sum + saleCost;
   }, 0);
 
-  const grossProfit = netRevenue - totalCost;
+  const grossProfit = Math.max(0, netRevenue - totalCost);
   const profitMarginPercent = netRevenue > 0 ? ((grossProfit / netRevenue) * 100).toFixed(1) : '0';
 
   const cashSalesTotal = salesList
@@ -73,10 +75,10 @@ export const ReportsScreen: React.FC = () => {
     .filter((s) => s.paymentMethod === 'wallet')
     .reduce((sum, s) => sum + s.total, 0);
 
-  // Top selling products
+  // Top selling products (Net quantities and revenues after refunds)
   const productSalesMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
 
-  filteredSales.forEach((s) => {
+  salesList.forEach((s) => {
     s.items.forEach((it) => {
       if (!productSalesMap[it.productId]) {
         productSalesMap[it.productId] = {
@@ -85,8 +87,9 @@ export const ReportsScreen: React.FC = () => {
           revenue: 0,
         };
       }
-      productSalesMap[it.productId].quantity += it.quantity;
-      productSalesMap[it.productId].revenue += it.subtotal;
+      const netQty = Math.max(0, it.quantity - (it.refundedQuantity || 0));
+      productSalesMap[it.productId].quantity += netQty;
+      productSalesMap[it.productId].revenue += it.price * netQty;
     });
   });
 

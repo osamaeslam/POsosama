@@ -13,10 +13,15 @@ import { DebtsScreen } from './components/customers/DebtsScreen';
 import { SessionsScreen } from './components/shifts/SessionsScreen';
 import { ReportsScreen } from './components/reports/ReportsScreen';
 import { SettingsScreen } from './components/settings/SettingsScreen';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, isAuthenticated } = useApp();
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
 
   const renderActiveScreen = () => {
     switch (activeTab) {

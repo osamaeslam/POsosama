@@ -299,7 +299,7 @@ export const POSScreen: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-slate-100">
       {/* LEFT AREA: Catalog, Barcode, Categories, Product Grid */}
-      <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200 bg-white">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden border-r border-slate-200 bg-white">
         {/* Top search & barcode bar */}
         <div className="p-3 border-b border-slate-200 bg-white space-y-2">
           <div className="flex items-center gap-2">
@@ -402,7 +402,7 @@ export const POSScreen: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               {filteredProducts.map((product) => {
                 const inCart = cart.find((i) => i.product.id === product.id);
                 const isOutOfStock = product.stock <= 0;
@@ -464,7 +464,7 @@ export const POSScreen: React.FC = () => {
       </div>
 
       {/* RIGHT AREA: Cart, Totals & Checkout Panel */}
-      <div className="w-full lg:w-[420px] bg-white flex flex-col h-auto lg:h-full shrink-0 border-t lg:border-t-0 shadow-lg z-10">
+      <div className="w-full lg:w-[380px] xl:w-[420px] 2xl:w-[460px] bg-white flex flex-col h-auto lg:h-full shrink-0 border-t lg:border-t-0 shadow-lg z-10">
         {/* Cart Header */}
         <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2">

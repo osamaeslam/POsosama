@@ -62,6 +62,9 @@ const NORMALIZED_KEYS = {
   expenses: 'bayaa_pos_expenses',
   shifts: 'bayaa_pos_shifts',
   debtPayments: 'bayaa_pos_debt_payments',
+  suppliers: 'bayaa_pos_suppliers',
+  supplierInvoices: 'bayaa_pos_supplier_invoices',
+  supplierPayments: 'bayaa_pos_supplier_payments',
 }
 
 function openDatabase() {
@@ -101,6 +104,12 @@ function openDatabase() {
         CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
         CREATE TABLE IF NOT EXISTS shifts (id TEXT PRIMARY KEY, opened_at TEXT NOT NULL, closed_at TEXT, payload TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS debt_payments (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT NOT NULL, amount REAL NOT NULL, payload TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, total_payable REAL NOT NULL DEFAULT 0, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_suppliers_phone ON suppliers(phone);
+        CREATE TABLE IF NOT EXISTS supplier_invoices (id TEXT PRIMARY KEY, invoice_number TEXT NOT NULL, supplier_id TEXT, total_amount REAL NOT NULL DEFAULT 0, paid_amount REAL NOT NULL DEFAULT 0, remaining_debt REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_supplier_invoices_supplier ON supplier_invoices(supplier_id);
+        CREATE TABLE IF NOT EXISTS supplier_payments (id TEXT PRIMARY KEY, supplier_id TEXT, amount REAL NOT NULL DEFAULT 0, receipt_number TEXT, created_at TEXT NOT NULL, payload TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(supplier_id);
       `)
       migrateNormalizedTables()
       return
@@ -112,8 +121,27 @@ function openDatabase() {
   loadJsonStore()
 }
 
+function parseIfString(value) {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }
+  return value
+}
+
 function asNumber(value) { return Number.isFinite(Number(value)) ? Number(value) : 0 }
-function asArray(value) { return Array.isArray(value) ? value : [] }
+function asArray(value) {
+  const parsed = parseIfString(value)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+function serializeForStore(value) {
+  if (typeof value === 'string') return value
+  return JSON.stringify(value)
+}
 
 function syncNormalizedData(key, value) {
   if (!database || !Object.values(NORMALIZED_KEYS).includes(key)) return
@@ -140,13 +168,21 @@ function syncNormalizedData(key, value) {
       database.prepare('DELETE FROM shifts').run(); const insert = database.prepare('INSERT INTO shifts (id, opened_at, closed_at, payload) VALUES (?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.openedAt || '', row.closedAt || null, JSON.stringify(row)))
     } else if (key === NORMALIZED_KEYS.debtPayments) {
       database.prepare('DELETE FROM debt_payments').run(); const insert = database.prepare('INSERT INTO debt_payments (id, customer_id, created_at, amount, payload) VALUES (?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.customerId || null, row.createdAt || '', asNumber(row.amount), JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.suppliers) {
+      database.prepare('DELETE FROM suppliers').run(); const insert = database.prepare('INSERT INTO suppliers (id, name, phone, total_payable, payload) VALUES (?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.name || '', row.phone || null, asNumber(row.totalPayable), JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.supplierInvoices) {
+      database.prepare('DELETE FROM supplier_invoices').run(); const insert = database.prepare('INSERT INTO supplier_invoices (id, invoice_number, supplier_id, total_amount, paid_amount, remaining_debt, created_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.invoiceNumber || '', row.supplierId || null, asNumber(row.totalAmount), asNumber(row.paidAmount), asNumber(row.remainingDebt), row.createdAt || '', JSON.stringify(row)))
+    } else if (key === NORMALIZED_KEYS.supplierPayments) {
+      database.prepare('DELETE FROM supplier_payments').run(); const insert = database.prepare('INSERT INTO supplier_payments (id, supplier_id, amount, receipt_number, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)'); rows.forEach((row) => insert.run(row.id, row.supplierId || null, asNumber(row.amount), row.receiptNumber || null, row.createdAt || '', JSON.stringify(row)))
     }
   })
   tx()
 }
 
 function migrateNormalizedTables() {
-  const rows = database.prepare('SELECT key, value FROM app_data WHERE key IN (?, ?, ?, ?, ?, ?, ?)').all(...Object.values(NORMALIZED_KEYS))
+  const keys = Object.values(NORMALIZED_KEYS)
+  const placeholders = keys.map(() => '?').join(', ')
+  const rows = database.prepare(`SELECT key, value FROM app_data WHERE key IN (${placeholders})`).all(...keys)
   rows.forEach((row) => { try { syncNormalizedData(row.key, JSON.parse(row.value)) } catch (error) { console.error('Normalized migration failed:', error) } })
 }
 
@@ -248,24 +284,31 @@ function registerDatabaseHandlers() {
   ipcMain.on('db:get-sync', (event, key) => {
     if (database) {
       const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
-      event.returnValue = row ? JSON.parse(row.value) : null
+      if (!row) {
+        event.returnValue = null
+        return
+      }
+      // If it's a string, return raw; if it was previously double-stringified or stored as object, handle cleanly
+      event.returnValue = row.value
       return
     }
-    event.returnValue = jsonStore[key] ?? null
+    const val = jsonStore[key] ?? null
+    event.returnValue = typeof val === 'string' ? val : (val ? JSON.stringify(val) : null)
   })
 
   ipcMain.on('db:set-sync', (event, key, value) => {
+    const rawString = serializeForStore(value)
     if (database) {
       const now = new Date().toISOString()
       database.prepare(`
         INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `).run(key, JSON.stringify(value), now)
+      `).run(key, rawString, now)
       syncNormalizedData(key, value)
       event.returnValue = true
       return
     }
-    jsonStore[key] = value
+    jsonStore[key] = rawString
     saveJsonStore()
     event.returnValue = true
   })
@@ -285,23 +328,24 @@ function registerDatabaseHandlers() {
   ipcMain.handle('db:get', (_event, key) => {
     if (database) {
       const row = database.prepare('SELECT value FROM app_data WHERE key = ?').get(key)
-      return row ? JSON.parse(row.value) : null
+      return row ? row.value : null
     }
-    return jsonStore[key] ?? null
+    const val = jsonStore[key] ?? null
+    return typeof val === 'string' ? val : (val ? JSON.stringify(val) : null)
   })
 
   ipcMain.handle('db:set', (_event, key, value) => {
+    const rawString = serializeForStore(value)
     if (database) {
       const now = new Date().toISOString()
-      const serialized = JSON.stringify(value)
       database.prepare(`
         INSERT INTO app_data (key, value, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `).run(key, serialized, now)
+      `).run(key, rawString, now)
       syncNormalizedData(key, value)
       return true
     }
-    jsonStore[key] = value
+    jsonStore[key] = rawString
     saveJsonStore()
     return true
   })
@@ -346,12 +390,17 @@ function registerDatabaseHandlers() {
 }
 
 function createWindow() {
+  const iconPath = fs.existsSync(path.join(__dirname, '..', 'public', 'assets', 'icon.ico'))
+    ? path.join(__dirname, '..', 'public', 'assets', 'icon.ico')
+    : path.join(__dirname, '..', 'public', 'assets', 'icon.png')
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 800,
     minHeight: 500,
     show: false,
+    icon: iconPath,
     backgroundColor: '#f1f5f9',
     autoHideMenuBar: true,
     webPreferences: {
