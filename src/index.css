@@ -99,12 +99,24 @@
     display: block !important;
   }
 
-  @page {
+  /* Give each print format its real paper size. `auto` makes thermal receipts
+     render inside the browser's default A4/Letter sheet, leaving large blank areas. */
+  @page thermal-receipt {
+    size: 80mm auto;
     margin: 0;
-    size: auto;
+  }
+
+  @page a4-invoice {
+    size: A4 portrait;
+    margin: 0;
   }
 
   .receipt-thermal-roll {
+    page: thermal-receipt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+
+
     width: 76mm !important;
     max-width: 80mm !important;
     margin: 0 auto !important;
@@ -124,6 +136,9 @@
   }
 
   .receipt-a4-page {
+    page: a4-invoice;
+    break-inside: avoid;
+    page-break-inside: avoid;
     width: 100% !important;
     max-width: 210mm !important;
     margin: 0 auto !important;
